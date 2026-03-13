@@ -201,19 +201,6 @@ Configure log level via `LOG_LEVEL` environment variable.
 
 Contributions are welcome! Please follow the existing code style and add tests for new features.
 
-## License
-
-MIT License - See LICENSE file for details
-
 ## Support
 
 For issues and questions, please open an issue on the repository.
-
-## Roadmap
-
-- [ ] Multi-language support
-- [ ] Advanced email classification
-- [ ] Customer sentiment analysis
-- [ ] Escalation workflow
-- [ ] Knowledge base integration
-- [ ] Metrics and analytics dashboard
