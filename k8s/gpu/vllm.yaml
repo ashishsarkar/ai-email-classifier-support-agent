@@ -1,0 +1,113 @@
+# vLLM deployment — runs on GPU node pool
+# Requires: NVIDIA GPU Operator installed on the cluster
+# Node requirement: g5.xlarge (A10G 24GB) or similar
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: email-agent
+  labels:
+    app: vllm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm
+  template:
+    metadata:
+      labels:
+        app: vllm
+    spec:
+      # Schedule ONLY on GPU nodes
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:latest
+          args:
+            - "--model"
+            - "Qwen/Qwen3-8B-AWQ"         # 4-bit quantized (~8GB VRAM)
+            - "--port"
+            - "8001"
+            - "--max-model-len"
+            - "8192"
+            - "--quantization"
+            - "awq"
+            - "--gpu-memory-utilization"
+            - "0.90"                        # Use 90% of GPU memory
+            - "--max-num-batched-tokens"
+            - "16384"                       # Continuous batching capacity
+            - "--max-num-seqs"
+            - "64"                          # Max concurrent sequences
+            - "--enable-prefix-caching"     # Cache common prompt prefixes
+            - "--disable-log-requests"      # Reduce log noise in production
+          ports:
+            - containerPort: 8001
+              name: http
+          resources:
+            requests:
+              cpu: "2"
+              memory: 12Gi
+              nvidia.com/gpu: "1"           # Request 1 GPU
+            limits:
+              cpu: "4"
+              memory: 16Gi
+              nvidia.com/gpu: "1"
+          readinessProbe:
+            httpGet:
+              path: /v1/models
+              port: 8001
+            initialDelaySeconds: 120        # Model loading takes time
+            periodSeconds: 15
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /v1/models
+              port: 8001
+            initialDelaySeconds: 180
+            periodSeconds: 30
+            failureThreshold: 5
+          # vLLM needs shared memory for NCCL
+          volumeMounts:
+            - name: shm
+              mountPath: /dev/shm
+            - name: model-cache
+              mountPath: /root/.cache/huggingface
+      volumes:
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Gi
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: model-cache-pvc
+---
+# PVC for HuggingFace model cache (avoid re-downloading on restart)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-cache-pvc
+  namespace: email-agent
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 30Gi               # Qwen3-8B-AWQ is ~5GB, extra room for tokenizer etc.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+  namespace: email-agent
+spec:
+  selector:
+    app: vllm
+  ports:
+    - port: 8001
+      targetPort: 8001
+      name: http

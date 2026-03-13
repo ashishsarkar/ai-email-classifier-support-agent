@@ -1,0 +1,35 @@
+# NGINX Ingress with rate limiting and TLS
+# Prerequisites:
+#   - NGINX Ingress Controller installed
+#   - cert-manager for TLS (or provide your own secret)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: email-agent-ingress
+  namespace: email-agent
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    # Rate limiting: 100 requests/sec per IP
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+    # TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - email-agent.yourdomain.com      # REPLACE with your domain
+      secretName: email-agent-tls
+  rules:
+    - host: email-agent.yourdomain.com    # REPLACE with your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: email-agent-api
+                port:
+                  number: 8000

@@ -1,0 +1,174 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vector-store-pvc
+  namespace: email-agent
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: email-agent-api
+  namespace: email-agent
+  labels:
+    app: email-agent-api
+spec:
+  replicas: 3                        # 3 replicas for 1000 emails/hour
+  selector:
+    matchLabels:
+      app: email-agent-api
+  template:
+    metadata:
+      labels:
+        app: email-agent-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      initContainers:
+        # Wait for DB to be ready before starting
+        - name: wait-for-db
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done']
+      containers:
+        - name: api
+          image: email-agent:latest    # Your built image from Dockerfile
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: email-agent-config
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: email-agent-secrets
+                  key: OPENAI_API_KEY
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: email-agent-secrets
+                  key: ANTHROPIC_API_KEY
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: email-agent-secrets
+                  key: DATABASE_URL
+            - name: EMAIL_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: email-agent-secrets
+                  key: EMAIL_ADDRESS
+            - name: EMAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: email-agent-secrets
+                  key: EMAIL_PASSWORD
+            - name: LANGCHAIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: email-agent-secrets
+                  key: LANGCHAIN_API_KEY
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: vector-store
+              mountPath: /app/data/vectors
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 5
+          # Graceful shutdown: let in-flight requests finish
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: vector-store
+          persistentVolumeClaim:
+            claimName: vector-store-pvc
+      # Spread pods across nodes for HA
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: email-agent-api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: email-agent-api
+  namespace: email-agent
+spec:
+  selector:
+    app: email-agent-api
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+---
+# Horizontal Pod Autoscaler — scales API pods based on CPU/request rate
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: email-agent-api-hpa
+  namespace: email-agent
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: email-agent-api
+  minReplicas: 3
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300    # Wait 5 min before scaling down
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120

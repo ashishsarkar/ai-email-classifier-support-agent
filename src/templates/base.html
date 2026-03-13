@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Customer Support Email Agent{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://htmx.org/dist/htmx.min.js"></script>
+  </head>
+  <body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+          <div class="flex items-center">
+            <h1 class="text-2xl font-bold text-blue-600">Email Agent</h1>
+          </div>
+          <div class="flex items-center space-x-8">
+            <a
+              href="/"
+              class="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+              >Test Email</a
+            >
+            <a
+              href="/ui/inbox"
+              class="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+              >Inbox</a
+            >
+            <a
+              href="/ui/reviews"
+              class="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+              >Reviews</a
+            >
+            <a
+              href="/ui/metrics"
+              class="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+              >Metrics</a
+            >
+            <a
+              href="/docs"
+              class="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+              target="_blank"
+              >API Docs</a
+            >
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+      {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white mt-12">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 border-t">
+        <p class="text-center text-gray-500 text-sm">
+          Customer Support Email Agent v0.1.0
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      // Utility: Format datetime
+      function formatDate(dateStr) {
+        if (!dateStr) return "N/A";
+        const date = new Date(dateStr);
+        return date.toLocaleString();
+      }
+
+      // Utility: Format percentage
+      function formatPercent(value) {
+        if (value === null || value === undefined) return "N/A";
+        return (value * 100).toFixed(1) + "%";
+      }
+
+      // Utility: Get status badge color
+      function getStatusColor(status) {
+        const colors = {
+          pending: "bg-yellow-100 text-yellow-800",
+          processing: "bg-blue-100 text-blue-800",
+          awaiting_review: "bg-purple-100 text-purple-800",
+          responded: "bg-green-100 text-green-800",
+          failed: "bg-red-100 text-red-800",
+          archived: "bg-gray-100 text-gray-800",
+        };
+        return colors[status] || "bg-gray-100 text-gray-800";
+      }
+
+      // Utility: Get priority badge color
+      function getPriorityColor(priority) {
+        const colors = {
+          low: "bg-green-100 text-green-800",
+          medium: "bg-yellow-100 text-yellow-800",
+          high: "bg-orange-100 text-orange-800",
+          urgent: "bg-red-100 text-red-800",
+        };
+        return colors[priority] || "bg-gray-100 text-gray-800";
+      }
+
+      // Global error handler
+      document.addEventListener("htmx:responseError", function (event) {
+        console.error("HTMX error:", event);
+        alert("An error occurred. Please check the console.");
+      });
+    </script>
+
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

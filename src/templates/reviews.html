@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+
+{% block title %}Review Dashboard - Customer Support Email Agent{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Header -->
+  <div class="flex justify-between items-center">
+    <div>
+      <h2 class="text-3xl font-bold text-gray-900">Human Review Dashboard</h2>
+      <p class="mt-1 text-sm text-gray-500">Review and approve AI-generated responses before they are sent to customers.</p>
+    </div>
+    <button onclick="loadPendingReviews()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm">
+      Refresh
+    </button>
+  </div>
+
+  <!-- Stats Bar -->
+  <div id="stats-bar" class="grid grid-cols-3 gap-4">
+    <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+      <p class="text-sm text-purple-600 font-medium">Pending Reviews</p>
+      <p id="stat-pending" class="text-2xl font-bold text-purple-900">-</p>
+    </div>
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+      <p class="text-sm text-green-600 font-medium">Approved Today</p>
+      <p id="stat-approved" class="text-2xl font-bold text-green-900">-</p>
+    </div>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+      <p class="text-sm text-red-600 font-medium">Rejected Today</p>
+      <p id="stat-rejected" class="text-2xl font-bold text-red-900">-</p>
+    </div>
+  </div>
+
+  <!-- Reviews List -->
+  <div id="reviews-list" class="space-y-4">
+    <div class="text-center py-12 text-gray-500">
+      <p>Loading pending reviews...</p>
+    </div>
+  </div>
+
+  <!-- Review Detail Modal -->
+  <div id="review-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-10 mx-auto p-0 w-full max-w-4xl">
+      <div class="bg-white rounded-lg shadow-xl">
+        <!-- Modal Header -->
+        <div class="flex justify-between items-center px-6 py-4 border-b">
+          <h3 id="modal-title" class="text-lg font-bold text-gray-900">Review Details</h3>
+          <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="px-6 py-4 space-y-6 max-h-[70vh] overflow-y-auto">
+          <!-- Email Info -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs font-medium text-gray-500 uppercase">From</label>
+              <p id="modal-sender" class="text-sm text-gray-900"></p>
+            </div>
+            <div>
+              <label class="text-xs font-medium text-gray-500 uppercase">Subject</label>
+              <p id="modal-subject" class="text-sm text-gray-900"></p>
+            </div>
+          </div>
+
+          <!-- Classification Badges -->
+          <div class="flex gap-3">
+            <span id="modal-category" class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800"></span>
+            <span id="modal-priority" class="px-2 py-1 text-xs font-medium rounded-full"></span>
+            <span id="modal-reason" class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800"></span>
+          </div>
+
+          <!-- Original Email Body -->
+          <div>
+            <label class="text-xs font-medium text-gray-500 uppercase">Customer Email</label>
+            <div id="modal-body" class="mt-1 bg-gray-50 border rounded-md p-4 text-sm text-gray-700 whitespace-pre-wrap"></div>
+          </div>
+
+          <!-- AI Generated Response -->
+          <div>
+            <label class="text-xs font-medium text-gray-500 uppercase">AI-Generated Response</label>
+            <textarea
+              id="modal-response"
+              rows="8"
+              class="mt-1 w-full border border-gray-300 rounded-md p-4 text-sm text-gray-700 focus:ring-blue-500 focus:border-blue-500"
+            ></textarea>
+            <p class="text-xs text-gray-400 mt-1">You can edit the response before approving.</p>
+          </div>
+
+          <!-- Reviewer Notes -->
+          <div>
+            <label class="text-xs font-medium text-gray-500 uppercase">Reviewer Notes (optional)</label>
+            <textarea
+              id="modal-notes"
+              rows="2"
+              placeholder="Add notes about your decision..."
+              class="mt-1 w-full border border-gray-300 rounded-md p-3 text-sm text-gray-700 focus:ring-blue-500 focus:border-blue-500"
+            ></textarea>
+          </div>
+
+          <!-- Rejection Reason (hidden by default) -->
+          <div id="reject-reason-container" class="hidden">
+            <label class="text-xs font-medium text-red-500 uppercase">Rejection Reason (required)</label>
+            <input
+              id="modal-reject-reason"
+              type="text"
+              placeholder="Why is this response being rejected?"
+              class="mt-1 w-full border border-red-300 rounded-md p-3 text-sm text-gray-700 focus:ring-red-500 focus:border-red-500"
+            />
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="flex justify-between items-center px-6 py-4 border-t bg-gray-50 rounded-b-lg">
+          <button
+            onclick="escalateReview()"
+            class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 text-sm font-medium"
+          >
+            Escalate
+          </button>
+          <div class="flex gap-3">
+            <button
+              onclick="toggleRejectMode()"
+              id="reject-btn"
+              class="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 text-sm font-medium"
+            >
+              Reject
+            </button>
+            <button
+              onclick="approveReview()"
+              id="approve-btn"
+              class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 text-sm font-medium"
+            >
+              Approve & Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let currentReviewId = null;
+  let isRejectMode = false;
+
+  // Load pending reviews on page load
+  document.addEventListener("DOMContentLoaded", loadPendingReviews);
+
+  async function loadPendingReviews() {
+    try {
+      const response = await fetch("/api/reviews/pending");
+      const reviews = await response.json();
+
+      document.getElementById("stat-pending").textContent = reviews.length;
+
+      const container = document.getElementById("reviews-list");
+
+      if (reviews.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 bg-white rounded-lg border">
+            <svg class="mx-auto h-12 w-12 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="mt-4 text-lg text-gray-600">All caught up! No pending reviews.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = reviews.map(review => `
+        <div class="bg-white border rounded-lg p-5 hover:shadow-md transition-shadow cursor-pointer"
+             onclick="openReview(${review.id})">
+          <div class="flex justify-between items-start">
+            <div class="flex-1">
+              <div class="flex items-center gap-3">
+                <h3 class="font-semibold text-gray-900">${escapeHtml(review.subject)}</h3>
+                <span class="px-2 py-0.5 text-xs font-medium rounded-full ${getPriorityColor(review.priority)}">
+                  ${review.priority || 'medium'}
+                </span>
+              </div>
+              <p class="text-sm text-gray-500 mt-1">From: ${escapeHtml(review.sender)}</p>
+              <div class="flex items-center gap-2 mt-2">
+                <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                  ${review.category || 'uncategorized'}
+                </span>
+                <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                  ${review.reason.replace(/_/g, ' ')}
+                </span>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                ${review.status}
+              </span>
+              <p class="text-xs text-gray-400 mt-2">${formatDate(review.created_at)}</p>
+            </div>
+          </div>
+          ${review.generated_response ? `
+          <div class="mt-3 pt-3 border-t">
+            <p class="text-xs text-gray-500 uppercase font-medium">AI Response Preview</p>
+            <p class="text-sm text-gray-600 mt-1 line-clamp-2">${escapeHtml(review.generated_response.substring(0, 200))}...</p>
+          </div>
+          ` : ''}
+        </div>
+      `).join('');
+
+    } catch (error) {
+      console.error("Failed to load reviews:", error);
+      document.getElementById("reviews-list").innerHTML = `
+        <div class="text-center py-12 text-red-500">
+          <p>Failed to load reviews. Please try again.</p>
+        </div>
+      `;
+    }
+  }
+
+  async function openReview(reviewId) {
+    try {
+      const response = await fetch(`/api/reviews/${reviewId}`);
+      if (!response.ok) throw new Error("Failed to load review");
+      const review = await response.json();
+
+      currentReviewId = reviewId;
+      isRejectMode = false;
+      document.getElementById("reject-reason-container").classList.add("hidden");
+      document.getElementById("reject-btn").textContent = "Reject";
+
+      document.getElementById("modal-title").textContent = `Review #${review.id} - Email #${review.email_id}`;
+      document.getElementById("modal-sender").textContent = review.sender;
+      document.getElementById("modal-subject").textContent = review.subject;
+      document.getElementById("modal-body").textContent = review.body;
+      document.getElementById("modal-response").value = review.generated_response || "";
+      document.getElementById("modal-notes").value = "";
+      document.getElementById("modal-reject-reason").value = "";
+
+      document.getElementById("modal-category").textContent = review.category || "uncategorized";
+      const priorityEl = document.getElementById("modal-priority");
+      priorityEl.textContent = review.priority || "medium";
+      priorityEl.className = `px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(review.priority)}`;
+      document.getElementById("modal-reason").textContent = (review.reason || "").replace(/_/g, " ");
+
+      document.getElementById("review-modal").classList.remove("hidden");
+
+    } catch (error) {
+      console.error("Failed to open review:", error);
+      alert("Failed to load review details.");
+    }
+  }
+
+  function closeModal() {
+    document.getElementById("review-modal").classList.add("hidden");
+    currentReviewId = null;
+  }
+
+  async function approveReview() {
+    if (!currentReviewId) return;
+
+    const approvedResponse = document.getElementById("modal-response").value.trim();
+    const reviewerNotes = document.getElementById("modal-notes").value.trim();
+
+    if (!approvedResponse) {
+      alert("Response text cannot be empty.");
+      return;
+    }
+
+    const btn = document.getElementById("approve-btn");
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+
+    try {
+      const response = await fetch(`/api/reviews/${currentReviewId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          approved_response: approvedResponse,
+          reviewer_notes: reviewerNotes || null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || "Approval failed");
+      }
+
+      closeModal();
+      loadPendingReviews();
+
+      // Show success notification
+      showNotification(
+        result.response_sent
+          ? "Response approved and sent to customer!"
+          : "Response approved but sending failed.",
+        result.response_sent ? "success" : "warning"
+      );
+
+    } catch (error) {
+      console.error("Approval failed:", error);
+      alert(`Approval failed: ${error.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Approve & Send";
+    }
+  }
+
+  function toggleRejectMode() {
+    isRejectMode = !isRejectMode;
+    const container = document.getElementById("reject-reason-container");
+    const btn = document.getElementById("reject-btn");
+
+    if (isRejectMode) {
+      container.classList.remove("hidden");
+      btn.textContent = "Confirm Reject";
+      btn.onclick = confirmReject;
+    } else {
+      container.classList.add("hidden");
+      btn.textContent = "Reject";
+      btn.onclick = toggleRejectMode;
+    }
+  }
+
+  async function confirmReject() {
+    if (!currentReviewId) return;
+
+    const rejectionReason = document.getElementById("modal-reject-reason").value.trim();
+    const reviewerNotes = document.getElementById("modal-notes").value.trim();
+
+    if (!rejectionReason) {
+      alert("Please provide a rejection reason.");
+      return;
+    }
+
+    const btn = document.getElementById("reject-btn");
+    btn.disabled = true;
+    btn.textContent = "Rejecting...";
+
+    try {
+      const response = await fetch(`/api/reviews/${currentReviewId}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rejection_reason: rejectionReason,
+          reviewer_notes: reviewerNotes || null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || "Rejection failed");
+      }
+
+      closeModal();
+      loadPendingReviews();
+      showNotification("Review rejected. Response will NOT be sent.", "error");
+
+    } catch (error) {
+      console.error("Rejection failed:", error);
+      alert(`Rejection failed: ${error.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Reject";
+      btn.onclick = toggleRejectMode;
+      isRejectMode = false;
+    }
+  }
+
+  async function escalateReview() {
+    if (!currentReviewId) return;
+
+    const reviewerNotes = document.getElementById("modal-notes").value.trim();
+    const escalateTo = prompt("Escalate to (e.g., 'senior-agent', 'manager'):", "senior-agent");
+
+    if (!escalateTo) return;
+
+    try {
+      const response = await fetch(`/api/reviews/${currentReviewId}/escalate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          escalate_to: escalateTo,
+          reviewer_notes: reviewerNotes || null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || "Escalation failed");
+      }
+
+      closeModal();
+      loadPendingReviews();
+      showNotification(`Review escalated to ${escalateTo}.`, "warning");
+
+    } catch (error) {
+      console.error("Escalation failed:", error);
+      alert(`Escalation failed: ${error.message}`);
+    }
+  }
+
+  function showNotification(message, type) {
+    const colors = {
+      success: "bg-green-500",
+      error: "bg-red-500",
+      warning: "bg-yellow-500",
+    };
+
+    const notification = document.createElement("div");
+    notification.className = `fixed top-4 right-4 ${colors[type] || 'bg-blue-500'} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity duration-500`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+      notification.style.opacity = "0";
+      setTimeout(() => notification.remove(), 500);
+    }, 4000);
+  }
+
+  function escapeHtml(text) {
+    if (!text) return "";
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Close modal on outside click
+  document.getElementById("review-modal").addEventListener("click", function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // Close modal on Escape key
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") closeModal();
+  });
+</script>
+{% endblock %}

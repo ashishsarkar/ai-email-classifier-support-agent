@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Test Email - Customer Support Email Agent{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <div class="bg-white rounded-lg shadow p-8">
+    <h2 class="text-3xl font-bold text-gray-900 mb-2">Test Email Submission</h2>
+    <p class="text-gray-600 mb-8">
+      Submit a mock customer email to test the agent's classification, KB search, and response generation.
+    </p>
+
+    <!-- Form -->
+    <form id="testEmailForm" class="space-y-6">
+      <div>
+        <label for="sender" class="block text-sm font-medium text-gray-700">
+          Sender Email
+        </label>
+        <input
+          type="email"
+          id="sender"
+          name="sender"
+          required
+          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+          placeholder="customer@example.com"
+          value="john.doe@example.com"
+        />
+      </div>
+
+      <div>
+        <label for="subject" class="block text-sm font-medium text-gray-700">
+          Subject
+        </label>
+        <input
+          type="text"
+          id="subject"
+          name="subject"
+          required
+          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+          placeholder="e.g., Can't sync files on my phone"
+          value="Help with billing question"
+        />
+      </div>
+
+      <div>
+        <label for="body" class="block text-sm font-medium text-gray-700">
+          Email Body
+        </label>
+        <textarea
+          id="body"
+          name="body"
+          required
+          rows="8"
+          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+          placeholder="Enter the customer email body here..."
+        >Hi there, I'm having trouble with my CloudSync subscription. I was charged twice last month and I'm not sure why. Can you help me understand the billing? Also, do you offer refunds?</textarea
+        >
+      </div>
+
+      <div>
+        <button
+          type="submit"
+          class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 font-medium transition"
+        >
+          Submit Test Email
+        </button>
+      </div>
+    </form>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="hidden mt-8 flex justify-center">
+      <div class="flex flex-col items-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p class="mt-4 text-gray-600">Processing email...</p>
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="resultsSection" class="hidden mt-8 space-y-6">
+      <div class="border-t pt-6">
+        <h3 class="text-2xl font-bold text-gray-900 mb-4">Agent Output</h3>
+
+        <!-- Email Info -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-sm text-gray-600">Email ID</p>
+              <p class="font-semibold text-gray-900" id="resultEmailId">-</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">Status</p>
+              <div id="resultStatus"></div>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">Processing Time</p>
+              <p class="font-semibold text-gray-900" id="resultTime">-</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">Human Review Needed</p>
+              <p class="font-semibold text-gray-900" id="resultReview">-</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Classification Results -->
+        <div class="bg-blue-50 rounded-lg p-4 mb-6">
+          <h4 class="font-bold text-gray-900 mb-3">Classification</h4>
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <p class="text-sm text-gray-600">Category</p>
+              <p class="font-semibold text-gray-900" id="resultCategory">-</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">Priority</p>
+              <div id="resultPriority"></div>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">Confidence</p>
+              <p class="font-semibold text-gray-900" id="resultConfidence">-</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Context Summary -->
+        <div class="bg-green-50 rounded-lg p-4 mb-6">
+          <h4 class="font-bold text-gray-900 mb-3">Knowledge Base Context</h4>
+          <div
+            id="resultContext"
+            class="text-gray-900 text-sm whitespace-pre-wrap max-h-48 overflow-y-auto"
+          >
+            -
+          </div>
+        </div>
+
+        <!-- Generated Response -->
+        <div class="bg-yellow-50 rounded-lg p-4 mb-6">
+          <h4 class="font-bold text-gray-900 mb-3">Generated Response</h4>
+          <div
+            id="resultResponse"
+            class="bg-white rounded p-3 text-gray-900 whitespace-pre-wrap max-h-64 overflow-y-auto"
+          >
+            -
+          </div>
+        </div>
+
+        <!-- Error if any -->
+        <div id="resultError" class="hidden bg-red-50 border border-red-200 rounded-lg p-4">
+          <p class="font-bold text-red-900 mb-2">Error</p>
+          <p id="resultErrorText" class="text-red-800 text-sm"></p>
+        </div>
+      </div>
+
+      <!-- View in Inbox Button -->
+      <div>
+        <a
+          id="viewInboxButton"
+          href="/ui/inbox"
+          class="inline-block bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 font-medium transition"
+        >
+          View in Inbox
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById("testEmailForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const sender = document.getElementById("sender").value;
+    const subject = document.getElementById("subject").value;
+    const body = document.getElementById("body").value;
+
+    // Show loading, hide results
+    document.getElementById("loadingSpinner").classList.remove("hidden");
+    document.getElementById("resultsSection").classList.add("hidden");
+    document.getElementById("resultError").classList.add("hidden");
+
+    try {
+      const response = await fetch("/api/emails/test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sender, subject, body }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || "Failed to submit email");
+      }
+
+      const data = await response.json();
+
+      // Populate results
+      document.getElementById("resultEmailId").textContent = data.email_id;
+      document.getElementById("resultCategory").textContent = data.category || "-";
+      document.getElementById("resultConfidence").textContent = formatPercent(
+        data.confidence_score
+      );
+      document.getElementById("resultTime").textContent = data.execution_time_ms
+        ? data.execution_time_ms + "ms"
+        : "-";
+      document.getElementById("resultReview").textContent = data.needs_human_review
+        ? "Yes"
+        : "No";
+
+      // Status badge
+      const statusBadge = document.createElement("span");
+      statusBadge.className = "inline-block px-3 py-1 rounded-full text-sm font-semibold " + getStatusColor(data.status);
+      statusBadge.textContent = data.status;
+      document.getElementById("resultStatus").innerHTML = "";
+      document.getElementById("resultStatus").appendChild(statusBadge);
+
+      // Priority badge
+      if (data.priority) {
+        const priorityBadge = document.createElement("span");
+        priorityBadge.className = "inline-block px-3 py-1 rounded-full text-sm font-semibold " + getPriorityColor(data.priority);
+        priorityBadge.textContent = data.priority;
+        document.getElementById("resultPriority").innerHTML = "";
+        document.getElementById("resultPriority").appendChild(priorityBadge);
+      }
+
+      // Context
+      if (data.context_summary) {
+        document.getElementById("resultContext").textContent = data.context_summary;
+      } else {
+        document.getElementById("resultContext").textContent = "No KB results found";
+      }
+
+      // Response
+      if (data.generated_response) {
+        document.getElementById("resultResponse").textContent = data.generated_response;
+      } else {
+        document.getElementById("resultResponse").textContent =
+          "No response generated (check error message)";
+      }
+
+      // Error
+      if (data.error_message) {
+        document.getElementById("resultError").classList.remove("hidden");
+        document.getElementById("resultErrorText").textContent = data.error_message;
+      }
+
+      // Show results
+      document.getElementById("loadingSpinner").classList.add("hidden");
+      document.getElementById("resultsSection").classList.remove("hidden");
+
+      // Update inbox button
+      document.getElementById("viewInboxButton").href = `/ui/inbox`;
+    } catch (error) {
+      document.getElementById("loadingSpinner").classList.add("hidden");
+      document.getElementById("resultError").classList.remove("hidden");
+      document.getElementById("resultErrorText").textContent = error.message;
+      document.getElementById("resultsSection").classList.remove("hidden");
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,104 @@
+version: "3.8"
+
+services:
+  # Container 1: Qwen 3 8B on vLLM (GPU-accelerated inference)
+  vllm:
+    image: vllm/vllm-openai:latest
+    command:
+      - "--model"
+      - "Qwen/Qwen3-8B"
+      - "--port"
+      - "8001"
+      - "--max-model-len"
+      - "8192"
+    ports:
+      - "8001:8001"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+
+  # Container 2: LiteLLM Proxy (routing + fallback to Claude Sonnet)
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+    environment:
+      LITELLM_MASTER_KEY: "sk-litellm-master-key"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-sk-ant-dummy-key-replace-me}"
+    depends_on:
+      vllm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # Container 3: PostgreSQL Database
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: customer_support
+      POSTGRES_USER: agent
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent -d customer_support"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Container 4: Customer Support Agent (FastAPI + LangGraph)
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      OPENAI_API_KEY: "sk-litellm-master-key"
+      OPENAI_MODEL: "default"
+      VLLM_BASE_URL: "http://litellm:4000/v1"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-sk-ant-dummy-key-replace-me}"
+      FALLBACK_MODEL: "claude-sonnet-4-6-20250514"
+      DATABASE_URL: "postgresql+asyncpg://agent:secret@db:5432/customer_support"
+      EMAIL_ADDRESS: "${EMAIL_ADDRESS}"
+      EMAIL_PASSWORD: "${EMAIL_PASSWORD}"
+      LOG_LEVEL: "INFO"
+      VECTOR_STORE_PATH: "/app/data/vectors"
+      # LangSmith Tracing
+      LANGSMITH_ENABLED: "${LANGSMITH_ENABLED:-false}"
+      LANGCHAIN_API_KEY: "${LANGCHAIN_API_KEY:-lsv2_pt_dummy_langsmith_api_key_replace_me}"
+      LANGCHAIN_TRACING_V2: "${LANGCHAIN_TRACING_V2:-false}"
+      LANGCHAIN_PROJECT: "${LANGCHAIN_PROJECT:-customer-support-email-agent}"
+      LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
+    volumes:
+      - vector_data:/app/data/vectors
+    depends_on:
+      litellm:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  vector_data:

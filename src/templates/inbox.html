@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+
+{% block title %}Inbox - Customer Support Email Agent{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Header and Controls -->
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-3xl font-bold text-gray-900 mb-4">Inbox</h2>
+
+    <!-- Stats Bar -->
+    <div class="grid grid-cols-5 gap-4 mb-6">
+      <div class="bg-blue-50 rounded-lg p-4">
+        <p class="text-sm text-gray-600">Total</p>
+        <p class="text-2xl font-bold text-blue-600" id="statsTotal">-</p>
+      </div>
+      <div class="bg-yellow-50 rounded-lg p-4">
+        <p class="text-sm text-gray-600">Pending</p>
+        <p class="text-2xl font-bold text-yellow-600" id="statsPending">-</p>
+      </div>
+      <div class="bg-purple-50 rounded-lg p-4">
+        <p class="text-sm text-gray-600">Processing</p>
+        <p class="text-2xl font-bold text-purple-600" id="statsProcessing">-</p>
+      </div>
+      <div class="bg-green-50 rounded-lg p-4">
+        <p class="text-sm text-gray-600">Responded</p>
+        <p class="text-2xl font-bold text-green-600" id="statsResponded">-</p>
+      </div>
+      <div class="bg-red-50 rounded-lg p-4">
+        <p class="text-sm text-gray-600">Failed</p>
+        <p class="text-2xl font-bold text-red-600" id="statsFailed">-</p>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="flex gap-4 items-center">
+      <select
+        id="statusFilter"
+        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:border-gray-400"
+      >
+        <option value="">All Statuses</option>
+        <option value="pending">Pending</option>
+        <option value="processing">Processing</option>
+        <option value="responded">Responded</option>
+        <option value="failed">Failed</option>
+        <option value="archived">Archived</option>
+      </select>
+
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="Search by sender or subject..."
+        class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:border-gray-400"
+      />
+
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          id="autoRefresh"
+          class="w-4 h-4 rounded border-gray-300"
+        />
+        <span class="text-sm text-gray-700">Auto-refresh</span>
+      </label>
+
+      <button
+        id="refreshButton"
+        class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium transition"
+      >
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Email Table -->
+  <div class="bg-white rounded-lg shadow overflow-hidden">
+    <div id="loadingSpinner" class="hidden p-8 flex justify-center">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+
+    <table id="emailTable" class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            ID
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            From
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Subject
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Category
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Priority
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Status
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Received
+          </th>
+        </tr>
+      </thead>
+      <tbody id="emailTableBody" class="bg-white divide-y divide-gray-200">
+        <tr>
+          <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+            Loading emails...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Pagination -->
+    <div class="bg-gray-50 px-6 py-4 flex items-center justify-between border-t">
+      <p class="text-sm text-gray-700">
+        Showing <span id="pageInfo">-</span>
+      </p>
+      <div class="flex gap-2">
+        <button
+          id="prevButton"
+          class="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-100"
+        >
+          Previous
+        </button>
+        <span id="pageNumbers" class="flex gap-1"></span>
+        <button
+          id="nextButton"
+          class="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-100"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div id="detailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+  <div class="bg-white w-full md:w-1/2 lg:w-1/3 max-h-screen overflow-y-auto rounded-t-lg">
+    <div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+      <h3 class="text-xl font-bold">Email Details</h3>
+      <button
+        id="closeDetailButton"
+        class="text-gray-500 hover:text-gray-700 font-bold text-2xl"
+      >
+        ×
+      </button>
+    </div>
+
+    <div id="detailContent" class="p-6 space-y-4">
+      <!-- Content will be loaded here -->
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentPage = 1;
+  let totalPages = 1;
+  let currentStatus = "";
+  let currentSearch = "";
+  let autoRefreshInterval = null;
+
+  const PER_PAGE = 20;
+
+  // Load emails
+  async function loadEmails(page = 1, status = "", search = "") {
+    currentPage = page;
+    currentStatus = status;
+    currentSearch = search;
+
+    document.getElementById("loadingSpinner").classList.remove("hidden");
+    document.getElementById("emailTableBody").innerHTML = '';
+
+    try {
+      let url = `/api/emails?page=${page}&per_page=${PER_PAGE}`;
+      if (status) url += `&status=${encodeURIComponent(status)}`;
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to load emails");
+
+      const data = await response.json();
+      let emails = data.emails || [];
+
+      // Client-side search filter
+      if (search.toLowerCase()) {
+        emails = emails.filter(
+          (e) =>
+            e.sender.toLowerCase().includes(search.toLowerCase()) ||
+            e.subject.toLowerCase().includes(search.toLowerCase())
+        );
+      }
+
+      totalPages = data.pages || 1;
+
+      renderEmailTable(emails);
+      updatePagination(page, data.total || 0);
+      updateStats();
+
+      document.getElementById("loadingSpinner").classList.add("hidden");
+    } catch (error) {
+      console.error("Error loading emails:", error);
+      document.getElementById("emailTableBody").innerHTML = `
+        <tr>
+          <td colspan="7" class="px-6 py-4 text-center text-red-500">
+            Error loading emails: ${error.message}
+          </td>
+        </tr>
+      `;
+      document.getElementById("loadingSpinner").classList.add("hidden");
+    }
+  }
+
+  function renderEmailTable(emails) {
+    if (emails.length === 0) {
+      document.getElementById("emailTableBody").innerHTML = `
+        <tr>
+          <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+            No emails found
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    const html = emails
+      .map(
+        (email) => `
+      <tr class="hover:bg-gray-50 cursor-pointer" onclick="openDetail(${email.id})">
+        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#${email.id}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${email.sender}</td>
+        <td class="px-6 py-4 text-sm text-gray-900 truncate">${email.subject}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${email.category || "-"}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm">
+          <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getPriorityColor(email.priority || "")}">
+            ${email.priority || "-"}
+          </span>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm">
+          <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(email.status)}">
+            ${email.status}
+          </span>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${formatDate(email.received_at)}</td>
+      </tr>
+    `
+      )
+      .join("");
+
+    document.getElementById("emailTableBody").innerHTML = html;
+  }
+
+  function updatePagination(page, total) {
+    const pageInfo = `${(page - 1) * PER_PAGE + 1}-${Math.min(page * PER_PAGE, total)} of ${total}`;
+    document.getElementById("pageInfo").textContent = pageInfo;
+
+    document.getElementById("prevButton").disabled = page === 1;
+    document.getElementById("nextButton").disabled = page >= totalPages;
+
+    // Page numbers
+    let pageNumbers = "";
+    for (let i = 1; i <= totalPages && i <= 5; i++) {
+      pageNumbers += `
+        <button
+          class="px-2 py-1 border rounded ${i === page ? "bg-blue-600 text-white border-blue-600" : "border-gray-300 hover:bg-gray-100"}"
+          onclick="loadEmails(${i}, '${currentStatus}', '${currentSearch}')"
+        >
+          ${i}
+        </button>
+      `;
+    }
+    document.getElementById("pageNumbers").innerHTML = pageNumbers;
+  }
+
+  async function updateStats() {
+    try {
+      const response = await fetch("/api/emails?page=1&per_page=1");
+      const data = await response.json();
+
+      // Count by status
+      const allEmails = (await fetch("/api/emails?page=1&per_page=1000")).then((r) =>
+        r.json()
+      );
+      const emails = allEmails.emails || [];
+
+      const stats = {
+        total: allEmails.total || 0,
+        pending: emails.filter((e) => e.status === "pending").length,
+        processing: emails.filter((e) => e.status === "processing").length,
+        responded: emails.filter((e) => e.status === "responded").length,
+        failed: emails.filter((e) => e.status === "failed").length,
+      };
+
+      document.getElementById("statsTotal").textContent = stats.total;
+      document.getElementById("statsPending").textContent = stats.pending;
+      document.getElementById("statsProcessing").textContent = stats.processing;
+      document.getElementById("statsResponded").textContent = stats.responded;
+      document.getElementById("statsFailed").textContent = stats.failed;
+    } catch (error) {
+      console.error("Error updating stats:", error);
+    }
+  }
+
+  // Detail modal
+  async function openDetail(emailId) {
+    try {
+      const response = await fetch(`/api/emails/${emailId}`);
+      if (!response.ok) throw new Error("Failed to load email");
+      const email = await response.json();
+
+      const content = `
+        <div class="space-y-4">
+          <!-- Header -->
+          <div class="border-b pb-4">
+            <p class="text-sm text-gray-600">From</p>
+            <p class="font-semibold text-gray-900">${email.sender}</p>
+          </div>
+
+          <div class="border-b pb-4">
+            <p class="text-sm text-gray-600">Subject</p>
+            <p class="font-semibold text-gray-900">${email.subject}</p>
+          </div>
+
+          <!-- Classification -->
+          <div class="bg-blue-50 rounded p-3">
+            <p class="text-sm font-semibold text-gray-900 mb-2">Classification</p>
+            <div class="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <p class="text-gray-600">Category</p>
+                <p class="font-semibold">${email.category || "-"}</p>
+              </div>
+              <div>
+                <p class="text-gray-600">Priority</p>
+                <p class="font-semibold">${email.priority || "-"}</p>
+              </div>
+              <div>
+                <p class="text-gray-600">Confidence</p>
+                <p class="font-semibold">${formatPercent(email.confidence_score)}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Email Body -->
+          <div class="border-b pb-4">
+            <p class="text-sm font-semibold text-gray-900 mb-2">Email Body</p>
+            <div class="bg-gray-50 rounded p-3 text-sm text-gray-800 max-h-32 overflow-y-auto whitespace-pre-wrap">
+              ${email.body}
+            </div>
+          </div>
+
+          <!-- Context -->
+          ${email.context_summary ? `
+            <div class="border-b pb-4">
+              <p class="text-sm font-semibold text-gray-900 mb-2">KB Context</p>
+              <div class="bg-green-50 rounded p-3 text-sm text-gray-800 max-h-32 overflow-y-auto whitespace-pre-wrap">
+                ${email.context_summary}
+              </div>
+            </div>
+          ` : ""}
+
+          <!-- Response -->
+          ${email.response ? `
+            <div class="border-b pb-4">
+              <p class="text-sm font-semibold text-gray-900 mb-2">Response</p>
+              <div class="bg-yellow-50 rounded p-3 text-sm text-gray-800 max-h-40 overflow-y-auto whitespace-pre-wrap">
+                ${email.response.response_text}
+              </div>
+              <p class="text-xs text-gray-600 mt-2">Model: ${email.response.model_used} | Tokens: ${email.response.tokens_used}</p>
+            </div>
+          ` : ""}
+
+          <!-- Review -->
+          ${email.review ? `
+            <div class="border-b pb-4">
+              <p class="text-sm font-semibold text-gray-900 mb-2">Review</p>
+              <p class="text-sm"><strong>Reason:</strong> ${email.review.reason}</p>
+              <p class="text-sm"><strong>Status:</strong> <span class="inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusColor(email.review.status)}">${email.review.status}</span></p>
+              ${email.review.reviewer_notes ? `<p class="text-sm"><strong>Notes:</strong> ${email.review.reviewer_notes}</p>` : ""}
+            </div>
+          ` : ""}
+
+          <!-- Metadata -->
+          <div class="text-xs text-gray-600">
+            <p>ID: ${email.id}</p>
+            <p>Status: ${email.status}</p>
+            <p>Received: ${formatDate(email.received_at)}</p>
+            ${email.processed_at ? `<p>Processed: ${formatDate(email.processed_at)}</p>` : ""}
+            ${email.error_message ? `<p class="text-red-600">Error: ${email.error_message}</p>` : ""}
+          </div>
+        </div>
+      `;
+
+      document.getElementById("detailContent").innerHTML = content;
+      document.getElementById("detailModal").classList.remove("hidden");
+    } catch (error) {
+      alert("Error loading email details: " + error.message);
+    }
+  }
+
+  // Close detail modal
+  document.getElementById("closeDetailButton").addEventListener("click", () => {
+    document.getElementById("detailModal").classList.add("hidden");
+  });
+
+  // Event listeners
+  document.getElementById("statusFilter").addEventListener("change", (e) => {
+    loadEmails(1, e.target.value, document.getElementById("searchInput").value);
+  });
+
+  document.getElementById("searchInput").addEventListener("input", (e) => {
+    loadEmails(1, document.getElementById("statusFilter").value, e.target.value);
+  });
+
+  document.getElementById("refreshButton").addEventListener("click", () => {
+    loadEmails(currentPage, currentStatus, currentSearch);
+  });
+
+  document.getElementById("prevButton").addEventListener("click", () => {
+    if (currentPage > 1) loadEmails(currentPage - 1, currentStatus, currentSearch);
+  });
+
+  document.getElementById("nextButton").addEventListener("click", () => {
+    if (currentPage < totalPages) loadEmails(currentPage + 1, currentStatus, currentSearch);
+  });
+
+  document.getElementById("autoRefresh").addEventListener("change", (e) => {
+    if (e.target.checked) {
+      autoRefreshInterval = setInterval(() => {
+        loadEmails(currentPage, currentStatus, currentSearch);
+      }, 10000); // Refresh every 10 seconds
+    } else {
+      clearInterval(autoRefreshInterval);
+    }
+  });
+
+  // Initial load
+  loadEmails();
+</script>
+{% endblock %}

@@ -1,0 +1,676 @@
+{% extends "base.html" %}
+
+{% block title %}Metrics Dashboard - Customer Support Email Agent{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Header -->
+  <div class="flex justify-between items-center">
+    <div>
+      <h2 class="text-3xl font-bold text-gray-900">Metrics Dashboard</h2>
+      <p class="mt-1 text-sm text-gray-500">Monitor classification accuracy, response times, review rates, and confidence scores.</p>
+    </div>
+    <div class="flex gap-2">
+      <select id="period-select" onchange="refreshAll()" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+        <option value="7">Last 7 days</option>
+        <option value="14">Last 14 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+      <button onclick="refreshAll()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm">
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI Cards Row -->
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" id="kpi-cards">
+    <div class="bg-white border rounded-lg p-4 shadow-sm">
+      <p class="text-xs text-gray-500 font-medium uppercase">Total Emails</p>
+      <p id="kpi-total" class="text-2xl font-bold text-gray-900 mt-1">-</p>
+    </div>
+    <div class="bg-white border rounded-lg p-4 shadow-sm">
+      <p class="text-xs text-gray-500 font-medium uppercase">Resolution Rate</p>
+      <p id="kpi-resolution" class="text-2xl font-bold text-green-600 mt-1">-</p>
+    </div>
+    <div class="bg-white border rounded-lg p-4 shadow-sm">
+      <p class="text-xs text-gray-500 font-medium uppercase">Auto-Send Rate</p>
+      <p id="kpi-autosend" class="text-2xl font-bold text-blue-600 mt-1">-</p>
+    </div>
+    <div class="bg-white border rounded-lg p-4 shadow-sm">
+      <p class="text-xs text-gray-500 font-medium uppercase">Human Review Rate</p>
+      <p id="kpi-review" class="text-2xl font-bold text-purple-600 mt-1">-</p>
+    </div>
+    <div class="bg-white border rounded-lg p-4 shadow-sm">
+      <p class="text-xs text-gray-500 font-medium uppercase">Avg Confidence</p>
+      <p id="kpi-confidence" class="text-2xl font-bold text-indigo-600 mt-1">-</p>
+    </div>
+    <div class="bg-white border rounded-lg p-4 shadow-sm">
+      <p class="text-xs text-gray-500 font-medium uppercase">Approval Rate</p>
+      <p id="kpi-approval" class="text-2xl font-bold text-green-600 mt-1">-</p>
+    </div>
+  </div>
+
+  <!-- Row 2: Charts -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Category Distribution (Donut) -->
+    <div class="bg-white border rounded-lg p-6 shadow-sm">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Category Distribution</h3>
+      <div class="relative" style="height: 280px;">
+        <canvas id="chart-categories"></canvas>
+      </div>
+    </div>
+
+    <!-- Daily Volume Trend (Line) -->
+    <div class="bg-white border rounded-lg p-6 shadow-sm">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Email Volume Trend</h3>
+      <div class="relative" style="height: 280px;">
+        <canvas id="chart-trend"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3: Review & Confidence -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Review Reasons (Horizontal Bar) -->
+    <div class="bg-white border rounded-lg p-6 shadow-sm">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Review Reasons Breakdown</h3>
+      <div class="relative" style="height: 280px;">
+        <canvas id="chart-review-reasons"></canvas>
+      </div>
+    </div>
+
+    <!-- Confidence Score Distribution (Bar) -->
+    <div class="bg-white border rounded-lg p-6 shadow-sm">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Confidence Score Distribution</h3>
+      <div class="relative" style="height: 280px;">
+        <canvas id="chart-confidence"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 4: Category vs Confidence & Priority -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Category vs Avg Confidence (Grouped Bar) -->
+    <div class="bg-white border rounded-lg p-6 shadow-sm">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Avg Confidence per Category</h3>
+      <div class="relative" style="height: 280px;">
+        <canvas id="chart-category-confidence"></canvas>
+      </div>
+    </div>
+
+    <!-- Priority Distribution (Donut) -->
+    <div class="bg-white border rounded-lg p-6 shadow-sm">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Priority Distribution</h3>
+      <div class="relative" style="height: 280px;">
+        <canvas id="chart-priorities"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 5: Token Usage -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Token Usage by Model -->
+    <div class="bg-white border rounded-lg p-6 shadow-sm">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Token Usage by Model</h3>
+      <div id="token-table" class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="border-b text-left text-gray-500 uppercase text-xs">
+              <th class="py-2 pr-4">Model</th>
+              <th class="py-2 pr-4">Requests</th>
+              <th class="py-2 pr-4">Total Tokens</th>
+              <th class="py-2">Avg/Request</th>
+            </tr>
+          </thead>
+          <tbody id="token-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Review Stats Summary -->
+    <div class="bg-white border rounded-lg p-6 shadow-sm">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Review Performance</h3>
+      <div class="space-y-4" id="review-stats">
+        <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+          <span class="text-sm text-green-700">Approved</span>
+          <span id="review-approved" class="text-lg font-bold text-green-700">-</span>
+        </div>
+        <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+          <span class="text-sm text-red-700">Rejected</span>
+          <span id="review-rejected" class="text-lg font-bold text-red-700">-</span>
+        </div>
+        <div class="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+          <span class="text-sm text-yellow-700">Escalated</span>
+          <span id="review-escalated" class="text-lg font-bold text-yellow-700">-</span>
+        </div>
+        <div class="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+          <span class="text-sm text-purple-700">Pending</span>
+          <span id="review-pending" class="text-lg font-bold text-purple-700">-</span>
+        </div>
+        <div class="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+          <span class="text-sm text-blue-700">Avg Wait Time</span>
+          <span id="review-wait" class="text-lg font-bold text-blue-700">-</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 6: Confidence Improvement Recommendations -->
+  <div class="bg-white border rounded-lg p-6 shadow-sm">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4">Confidence Improvement Recommendations</h3>
+    <div id="recommendations" class="space-y-3">
+      <p class="text-gray-500">Loading recommendations...</p>
+    </div>
+  </div>
+
+  <!-- Row 7: Confidence Trend Over Time -->
+  <div class="bg-white border rounded-lg p-6 shadow-sm">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4">Confidence Score Trend</h3>
+    <div class="relative" style="height: 300px;">
+      <canvas id="chart-confidence-trend"></canvas>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+  // Chart instances (for cleanup on refresh)
+  let charts = {};
+
+  const COLORS = {
+    blue: "rgba(59, 130, 246, 0.8)",
+    green: "rgba(34, 197, 94, 0.8)",
+    red: "rgba(239, 68, 68, 0.8)",
+    yellow: "rgba(234, 179, 8, 0.8)",
+    purple: "rgba(168, 85, 247, 0.8)",
+    indigo: "rgba(99, 102, 241, 0.8)",
+    pink: "rgba(236, 72, 153, 0.8)",
+    teal: "rgba(20, 184, 166, 0.8)",
+    orange: "rgba(249, 115, 22, 0.8)",
+    cyan: "rgba(6, 182, 212, 0.8)",
+  };
+
+  const CATEGORY_COLORS = [
+    COLORS.blue, COLORS.green, COLORS.purple, COLORS.orange,
+    COLORS.red, COLORS.teal, COLORS.pink, COLORS.indigo,
+    COLORS.yellow, COLORS.cyan,
+  ];
+
+  function getPeriod() {
+    return document.getElementById("period-select").value;
+  }
+
+  function destroyChart(name) {
+    if (charts[name]) {
+      charts[name].destroy();
+      delete charts[name];
+    }
+  }
+
+  // Load all data on page load
+  document.addEventListener("DOMContentLoaded", refreshAll);
+
+  async function refreshAll() {
+    const days = getPeriod();
+    await Promise.all([
+      loadOverview(days),
+      loadCategoryDistribution(days),
+      loadDailyTrend(days),
+      loadReviewReasons(days),
+      loadConfidenceAnalysis(days),
+      loadPriorityDistribution(days),
+      loadTokenUsage(days),
+    ]);
+  }
+
+  // --- Overview KPIs ---
+  async function loadOverview(days) {
+    try {
+      const res = await fetch(`/api/metrics/overview?days=${days}`);
+      const data = await res.json();
+
+      document.getElementById("kpi-total").textContent = data.total_emails.toLocaleString();
+      document.getElementById("kpi-resolution").textContent = data.rates.resolution_rate + "%";
+      document.getElementById("kpi-autosend").textContent = data.rates.auto_send_rate + "%";
+      document.getElementById("kpi-review").textContent = data.rates.review_rate + "%";
+      document.getElementById("kpi-confidence").textContent = (data.confidence.average * 100).toFixed(1) + "%";
+      document.getElementById("kpi-approval").textContent = data.rates.approval_rate + "%";
+
+      // Color code confidence
+      const confEl = document.getElementById("kpi-confidence");
+      const conf = data.confidence.average;
+      confEl.className = `text-2xl font-bold mt-1 ${conf >= 0.8 ? 'text-green-600' : conf >= 0.6 ? 'text-yellow-600' : 'text-red-600'}`;
+
+      // Review stats
+      document.getElementById("review-approved").textContent = data.reviews.approved;
+      document.getElementById("review-rejected").textContent = data.reviews.rejected;
+      document.getElementById("review-escalated").textContent = data.reviews.escalated;
+      document.getElementById("review-pending").textContent = data.reviews.pending;
+      document.getElementById("review-wait").textContent =
+        data.reviews.avg_wait_time_minutes > 0
+          ? data.reviews.avg_wait_time_minutes + " min"
+          : "N/A";
+
+    } catch (e) {
+      console.error("Failed to load overview:", e);
+    }
+  }
+
+  // --- Category Distribution (Donut) ---
+  async function loadCategoryDistribution(days) {
+    try {
+      const res = await fetch(`/api/metrics/category-distribution?days=${days}`);
+      const data = await res.json();
+
+      destroyChart("categories");
+      const ctx = document.getElementById("chart-categories").getContext("2d");
+
+      const labels = data.categories.map(c => c.category);
+      const counts = data.categories.map(c => c.count);
+
+      charts["categories"] = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: labels,
+          datasets: [{
+            data: counts,
+            backgroundColor: CATEGORY_COLORS.slice(0, labels.length),
+            borderWidth: 2,
+            borderColor: "#fff",
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "right", labels: { boxWidth: 12, font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const cat = data.categories[ctx.dataIndex];
+                  return `${cat.category}: ${cat.count} (${cat.percentage}%) - conf: ${(cat.avg_confidence * 100).toFixed(1)}%`;
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Also update category-confidence bar chart
+      destroyChart("categoryConfidence");
+      const ctx2 = document.getElementById("chart-category-confidence").getContext("2d");
+      charts["categoryConfidence"] = new Chart(ctx2, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: "Avg Confidence",
+              data: data.categories.map(c => (c.avg_confidence * 100).toFixed(1)),
+              backgroundColor: data.categories.map(c =>
+                c.avg_confidence >= 0.8 ? COLORS.green :
+                c.avg_confidence >= 0.6 ? COLORS.yellow : COLORS.red
+              ),
+              borderRadius: 4,
+            },
+            {
+              label: "Low Confidence Count",
+              data: data.categories.map(c => c.low_confidence_count),
+              backgroundColor: "rgba(239, 68, 68, 0.3)",
+              borderColor: COLORS.red,
+              borderWidth: 1,
+              borderRadius: 4,
+              yAxisID: "y1",
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true, title: { display: true, text: "Confidence %" } },
+            y1: { position: "right", beginAtZero: true, title: { display: true, text: "Low Conf Count" }, grid: { drawOnChartArea: false } },
+          },
+          plugins: { legend: { labels: { boxWidth: 12, font: { size: 11 } } } },
+        },
+      });
+
+    } catch (e) {
+      console.error("Failed to load categories:", e);
+    }
+  }
+
+  // --- Daily Trend (Line) ---
+  async function loadDailyTrend(days) {
+    try {
+      const res = await fetch(`/api/metrics/daily-trend?days=${Math.min(days, 90)}`);
+      const data = await res.json();
+
+      destroyChart("trend");
+      const ctx = document.getElementById("chart-trend").getContext("2d");
+
+      charts["trend"] = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: data.trend.map(d => d.date),
+          datasets: [
+            {
+              label: "Total",
+              data: data.trend.map(d => d.total),
+              borderColor: COLORS.blue,
+              backgroundColor: "rgba(59, 130, 246, 0.1)",
+              fill: true,
+              tension: 0.3,
+            },
+            {
+              label: "Responded",
+              data: data.trend.map(d => d.responded),
+              borderColor: COLORS.green,
+              backgroundColor: "transparent",
+              tension: 0.3,
+            },
+            {
+              label: "Awaiting Review",
+              data: data.trend.map(d => d.awaiting_review),
+              borderColor: COLORS.purple,
+              backgroundColor: "transparent",
+              tension: 0.3,
+            },
+            {
+              label: "Failed",
+              data: data.trend.map(d => d.failed),
+              borderColor: COLORS.red,
+              backgroundColor: "transparent",
+              tension: 0.3,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true },
+            x: { ticks: { maxTicksLimit: 10 } },
+          },
+          plugins: { legend: { labels: { boxWidth: 12, font: { size: 11 } } } },
+        },
+      });
+
+    } catch (e) {
+      console.error("Failed to load trend:", e);
+    }
+  }
+
+  // --- Review Reasons (Horizontal Bar) ---
+  async function loadReviewReasons(days) {
+    try {
+      const res = await fetch(`/api/metrics/review-reasons?days=${days}`);
+      const data = await res.json();
+
+      destroyChart("reviewReasons");
+      const ctx = document.getElementById("chart-review-reasons").getContext("2d");
+
+      const labels = data.reasons.map(r => r.reason.replace(/_/g, " "));
+
+      charts["reviewReasons"] = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: "Approved",
+              data: data.reasons.map(r => r.approved),
+              backgroundColor: COLORS.green,
+              borderRadius: 4,
+            },
+            {
+              label: "Rejected",
+              data: data.reasons.map(r => r.rejected),
+              backgroundColor: COLORS.red,
+              borderRadius: 4,
+            },
+            {
+              label: "Other",
+              data: data.reasons.map(r => r.count - r.approved - r.rejected),
+              backgroundColor: COLORS.yellow,
+              borderRadius: 4,
+            },
+          ],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { stacked: true, beginAtZero: true },
+            y: { stacked: true },
+          },
+          plugins: { legend: { labels: { boxWidth: 12, font: { size: 11 } } } },
+        },
+      });
+
+    } catch (e) {
+      console.error("Failed to load review reasons:", e);
+    }
+  }
+
+  // --- Confidence Analysis ---
+  async function loadConfidenceAnalysis(days) {
+    try {
+      const res = await fetch(`/api/metrics/confidence-analysis?days=${days}`);
+      const data = await res.json();
+
+      // Confidence distribution bar chart
+      destroyChart("confidence");
+      const ctx = document.getElementById("chart-confidence").getContext("2d");
+
+      const bucketLabels = {
+        "very_low_0_30": "< 30%",
+        "low_30_50": "30-50%",
+        "below_threshold_50_60": "50-60%",
+        "moderate_60_70": "60-70%",
+        "good_70_80": "70-80%",
+        "high_80_90": "80-90%",
+        "excellent_90_100": "90-100%",
+      };
+      const bucketColors = [
+        "rgba(239, 68, 68, 0.8)",   // very low - red
+        "rgba(249, 115, 22, 0.8)",  // low - orange
+        "rgba(234, 179, 8, 0.8)",   // below threshold - yellow
+        "rgba(234, 179, 8, 0.6)",   // moderate - light yellow
+        "rgba(34, 197, 94, 0.5)",   // good - light green
+        "rgba(34, 197, 94, 0.7)",   // high - green
+        "rgba(34, 197, 94, 0.9)",   // excellent - dark green
+      ];
+
+      const orderedBuckets = Object.keys(bucketLabels);
+      const bucketData = orderedBuckets.map(k => data.score_distribution[k] || 0);
+
+      charts["confidence"] = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: orderedBuckets.map(k => bucketLabels[k]),
+          datasets: [{
+            label: "Emails",
+            data: bucketData,
+            backgroundColor: bucketColors,
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.parsed.y} emails`,
+              },
+            },
+          },
+        },
+      });
+
+      // Confidence trend line chart
+      destroyChart("confidenceTrend");
+      const ctx2 = document.getElementById("chart-confidence-trend").getContext("2d");
+      charts["confidenceTrend"] = new Chart(ctx2, {
+        type: "line",
+        data: {
+          labels: data.confidence_trend.map(d => d.date),
+          datasets: [
+            {
+              label: "Avg Confidence %",
+              data: data.confidence_trend.map(d => (d.avg_confidence * 100).toFixed(1)),
+              borderColor: COLORS.indigo,
+              backgroundColor: "rgba(99, 102, 241, 0.1)",
+              fill: true,
+              tension: 0.3,
+              yAxisID: "y",
+            },
+            {
+              label: "Low Confidence Count",
+              data: data.confidence_trend.map(d => d.low_confidence_count),
+              borderColor: COLORS.red,
+              backgroundColor: "transparent",
+              tension: 0.3,
+              yAxisID: "y1",
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true, max: 100, title: { display: true, text: "Confidence %" } },
+            y1: { position: "right", beginAtZero: true, title: { display: true, text: "Low Conf Count" }, grid: { drawOnChartArea: false } },
+            x: { ticks: { maxTicksLimit: 10 } },
+          },
+          plugins: { legend: { labels: { boxWidth: 12, font: { size: 11 } } } },
+        },
+      });
+
+      // Recommendations
+      renderRecommendations(data.recommendations);
+
+    } catch (e) {
+      console.error("Failed to load confidence analysis:", e);
+    }
+  }
+
+  // --- Priority Distribution (Donut) ---
+  async function loadPriorityDistribution(days) {
+    try {
+      const res = await fetch(`/api/metrics/priority-distribution?days=${days}`);
+      const data = await res.json();
+
+      destroyChart("priorities");
+      const ctx = document.getElementById("chart-priorities").getContext("2d");
+
+      const priorityColors = {
+        low: COLORS.green,
+        medium: COLORS.yellow,
+        high: COLORS.orange,
+        urgent: COLORS.red,
+      };
+
+      charts["priorities"] = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: data.priorities.map(p => p.priority),
+          datasets: [{
+            data: data.priorities.map(p => p.count),
+            backgroundColor: data.priorities.map(p => priorityColors[p.priority] || COLORS.blue),
+            borderWidth: 2,
+            borderColor: "#fff",
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "right", labels: { boxWidth: 12, font: { size: 11 } } },
+          },
+        },
+      });
+
+    } catch (e) {
+      console.error("Failed to load priorities:", e);
+    }
+  }
+
+  // --- Token Usage ---
+  async function loadTokenUsage(days) {
+    try {
+      const res = await fetch(`/api/metrics/token-usage?days=${days}`);
+      const data = await res.json();
+
+      const tbody = document.getElementById("token-tbody");
+
+      if (data.by_model.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-gray-400">No token data yet</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.by_model.map(m => `
+        <tr class="border-b">
+          <td class="py-2 pr-4 font-medium">${escapeHtml(m.model)}</td>
+          <td class="py-2 pr-4">${m.request_count.toLocaleString()}</td>
+          <td class="py-2 pr-4">${m.total_tokens.toLocaleString()}</td>
+          <td class="py-2">${m.avg_tokens_per_request.toLocaleString()}</td>
+        </tr>
+      `).join('');
+
+    } catch (e) {
+      console.error("Failed to load token usage:", e);
+    }
+  }
+
+  // --- Render Recommendations ---
+  function renderRecommendations(recommendations) {
+    const container = document.getElementById("recommendations");
+
+    if (!recommendations || recommendations.length === 0) {
+      container.innerHTML = '<p class="text-gray-500">No recommendations available.</p>';
+      return;
+    }
+
+    const severityConfig = {
+      high: { bg: "bg-red-50", border: "border-red-200", icon: "text-red-600", badge: "bg-red-100 text-red-800" },
+      medium: { bg: "bg-yellow-50", border: "border-yellow-200", icon: "text-yellow-600", badge: "bg-yellow-100 text-yellow-800" },
+      low: { bg: "bg-green-50", border: "border-green-200", icon: "text-green-600", badge: "bg-green-100 text-green-800" },
+    };
+
+    container.innerHTML = recommendations.map(rec => {
+      const cfg = severityConfig[rec.severity] || severityConfig.medium;
+      return `
+        <div class="${cfg.bg} ${cfg.border} border rounded-lg p-4">
+          <div class="flex items-start gap-3">
+            <div class="flex-1">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 text-xs font-medium rounded-full ${cfg.badge}">${rec.severity}</span>
+                <h4 class="font-semibold text-gray-900 text-sm">${escapeHtml(rec.title)}</h4>
+              </div>
+              <p class="text-sm text-gray-600 mt-1">${escapeHtml(rec.description)}</p>
+              <p class="text-sm text-gray-800 mt-2 font-medium">Action: ${escapeHtml(rec.action)}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function escapeHtml(text) {
+    if (!text) return "";
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+model_list:
+  # Primary: Qwen 3 8B on local vLLM (fast, free, multilingual)
+  - model_name: "default"
+    litellm_params:
+      model: "openai/Qwen/Qwen3-8B"
+      api_base: "http://vllm:8001/v1"
+      api_key: "dummy"
+      max_tokens: 1000
+
+  # Fallback: Claude Sonnet 4.6 via Anthropic API
+  - model_name: "fallback-sonnet"
+    litellm_params:
+      model: "anthropic/claude-sonnet-4-6-20250514"
+      api_key: "sk-ant-dummy-key-replace-me"
+      max_tokens: 1000
+
+router_settings:
+  routing_strategy: "simple-shuffle"
+  num_retries: 2
+  timeout: 30
+  fallbacks:
+    - default: ["fallback-sonnet"]
+  set_verbose: true
+
+general_settings:
+  master_key: "sk-litellm-master-key"

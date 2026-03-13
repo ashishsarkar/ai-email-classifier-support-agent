@@ -1,0 +1,33 @@
+# PodMonitor for Prometheus Operator to scrape app metrics
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: email-agent-monitor
+  namespace: email-agent
+  labels:
+    release: prometheus                   # Must match your Prometheus release label
+spec:
+  selector:
+    matchLabels:
+      app: email-agent-api
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+# PodMonitor for vLLM metrics (throughput, latency, GPU utilization)
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: vllm-monitor
+  namespace: email-agent
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: vllm
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Support Email Agent - Architecture Diagram</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #faf9f6;
+      padding: 40px;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      font-size: 28px;
+      color: #1a1a2e;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 40px;
+    }
+
+    .canvas {
+      position: relative;
+      width: 1400px;
+      margin: 0 auto;
+      min-height: 2200px;
+    }
+
+    /* Section Boxes */
+    .section {
+      position: absolute;
+      border: 2px dashed;
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title .tech-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      text-transform: none;
+    }
+
+    /* Component Boxes */
+    .component {
+      background: white;
+      border: 1.5px solid #ddd;
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      position: absolute;
+    }
+    .component-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 4px;
+    }
+    .component-desc {
+      font-size: 10px;
+      color: #777;
+      line-height: 1.4;
+    }
+    .component-icon {
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    /* Node boxes inside pipeline */
+    .node {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: white;
+      border: 1.5px solid #ccc;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      position: absolute;
+    }
+    .node .num {
+      background: #4361ee;
+      color: white;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .node.slm-node { border-color: #10b981; background: #f0fdf4; }
+    .node.slm-node .num { background: #10b981; }
+    .node.llm-node { border-color: #8b5cf6; background: #f5f3ff; }
+    .node.llm-node .num { background: #8b5cf6; }
+    .node.logic-node { border-color: #6b7280; background: #f9fafb; }
+    .node.logic-node .num { background: #6b7280; }
+    .node.hitl-node { border-color: #f59e0b; background: #fffbeb; }
+    .node.hitl-node .num { background: #f59e0b; }
+
+    /* Arrows */
+    .arrow {
+      position: absolute;
+      pointer-events: none;
+    }
+    .arrow-label {
+      position: absolute;
+      font-size: 9px;
+      font-weight: 600;
+      color: #999;
+      background: #faf9f6;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    /* Tech logos */
+    .tech-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 10px;
+      position: absolute;
+    }
+
+    /* Color themes per section */
+    .email-source { border-color: #e2a03f; background: rgba(226,160,63,0.08); }
+    .email-source .section-title { color: #b07d2f; }
+
+    .ingestion { border-color: #4caf50; background: rgba(76,175,80,0.06); }
+    .ingestion .section-title { color: #2e7d32; }
+
+    .storage { border-color: #2196f3; background: rgba(33,150,243,0.06); }
+    .storage .section-title { color: #1565c0; }
+
+    .api-layer { border-color: #4caf50; background: rgba(76,175,80,0.06); }
+    .api-layer .section-title { color: #2e7d32; }
+
+    .llm-layer { border-color: #9c27b0; background: rgba(156,39,176,0.06); }
+    .llm-layer .section-title { color: #7b1fa2; }
+
+    .pipeline-section { border-color: #ff9800; background: rgba(255,152,0,0.04); }
+    .pipeline-section .section-title { color: #e65100; }
+
+    .hitl-section { border-color: #f59e0b; background: rgba(245,158,11,0.06); }
+    .hitl-section .section-title { color: #b45309; }
+
+    .client-section { border-color: #00897b; background: rgba(0,137,123,0.06); }
+    .client-section .section-title { color: #00695c; }
+
+    .observability { border-color: #e91e63; background: rgba(233,30,99,0.06); }
+    .observability .section-title { color: #c2185b; }
+
+    .kb-section { border-color: #607d8b; background: rgba(96,125,139,0.06); }
+    .kb-section .section-title { color: #37474f; }
+
+    /* Flow arrow connectors (SVG) */
+    svg.connectors {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Legend */
+    .legend {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      display: flex;
+      gap: 20px;
+      font-size: 11px;
+      align-items: center;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 2px solid;
+    }
+
+    /* Pipe flow boxes */
+    .pipe-step {
+      background: white;
+      border: 1.5px solid #ccc;
+      border-radius: 8px;
+      padding: 10px 14px;
+      text-align: center;
+      position: absolute;
+    }
+    .pipe-step .step-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #333;
+    }
+    .pipe-step .step-desc {
+      font-size: 9px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    .connector-line {
+      stroke: #999;
+      stroke-width: 2;
+      fill: none;
+      marker-end: url(#arrowhead);
+    }
+    .connector-line.thick {
+      stroke-width: 2.5;
+      stroke: #4361ee;
+    }
+    .connector-line.dashed {
+      stroke-dasharray: 6,4;
+    }
+    .connector-line.green { stroke: #10b981; }
+    .connector-line.purple { stroke: #8b5cf6; }
+    .connector-line.orange { stroke: #f59e0b; }
+    .connector-line.red { stroke: #ef4444; }
+    .connector-line.blue { stroke: #3b82f6; }
+
+    .z2 { z-index: 2; }
+  </style>
+</head>
+<body>
+
+<h1>Customer Support Email Agent - System Architecture</h1>
+<p class="subtitle">LangGraph + vLLM + LiteLLM + PostgreSQL + FAISS + LangSmith | 11-Node Agentic Pipeline with HITL</p>
+
+<div class="canvas">
+
+  <!-- SVG Connectors Layer -->
+  <svg class="connectors" viewBox="0 0 1400 2200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 10 3.5, 0 7" fill="#999" />
+      </marker>
+      <marker id="arrowhead-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
+      </marker>
+      <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 10 3.5, 0 7" fill="#10b981" />
+      </marker>
+      <marker id="arrowhead-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 10 3.5, 0 7" fill="#8b5cf6" />
+      </marker>
+      <marker id="arrowhead-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b" />
+      </marker>
+      <marker id="arrowhead-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444" />
+      </marker>
+    </defs>
+
+    <!-- Email Source → Ingestion -->
+    <line x1="200" y1="120" x2="200" y2="175" class="connector-line" marker-end="url(#arrowhead)" />
+    <text x="210" y="155" font-size="9" fill="#999" font-weight="600">IMAP/SMTP</text>
+
+    <!-- Ingestion → Storage -->
+    <line x1="500" y1="310" x2="1100" y2="180" class="connector-line dashed" marker-end="url(#arrowhead)" />
+    <text x="750" y="230" font-size="9" fill="#999" font-weight="600">Store emails + customers</text>
+
+    <!-- Ingestion → Pipeline trigger -->
+    <line x1="400" y1="340" x2="400" y2="420" class="connector-line thick" marker-end="url(#arrowhead-blue)" />
+    <text x="410" y="390" font-size="9" fill="#3b82f6" font-weight="600">workflow.ainvoke()</text>
+
+    <!-- Pipeline Node 1 → Node 2 -->
+    <line x1="200" y1="530" x2="370" y2="530" class="connector-line" marker-end="url(#arrowhead)" />
+    <!-- Node 2 → Node 3 -->
+    <line x1="540" y1="530" x2="700" y2="530" class="connector-line green" marker-end="url(#arrowhead-green)" />
+    <!-- Node 3 → Node 4 -->
+    <line x1="890" y1="530" x2="1030" y2="530" class="connector-line" marker-end="url(#arrowhead)" />
+    <!-- Node 4 → Node 5 (wrap to next row) -->
+    <path d="M 1210 550 L 1250 550 L 1250 620 L 200 620 L 200 640" class="connector-line" marker-end="url(#arrowhead)" />
+    <!-- Node 5 → Node 6 -->
+    <line x1="340" y1="660" x2="500" y2="660" class="connector-line purple" marker-end="url(#arrowhead-purple)" />
+    <!-- Node 6 conditional split -->
+    <line x1="710" y1="660" x2="850" y2="660" class="connector-line" marker-end="url(#arrowhead)" />
+    <text x="730" y="652" font-size="9" fill="#999" font-weight="600">needs_review?</text>
+
+    <!-- No review → Node 9 -->
+    <path d="M 850 680 L 850 750 L 680 750" class="connector-line green" marker-end="url(#arrowhead-green)" />
+    <text x="770" y="745" font-size="9" fill="#10b981" font-weight="600">NO</text>
+
+    <!-- Yes review → Node 7 -->
+    <line x1="1010" y1="660" x2="1100" y2="660" class="connector-line orange" marker-end="url(#arrowhead-orange)" />
+    <text x="1020" y="652" font-size="9" fill="#f59e0b" font-weight="600">YES</text>
+
+    <!-- Node 7 → Node 8 -->
+    <path d="M 1250 680 L 1250 750 L 1180 750" class="connector-line orange" marker-end="url(#arrowhead-orange)" />
+    <!-- Node 8 → PAUSE/END -->
+    <path d="M 1060 770 L 1060 820" class="connector-line red" marker-end="url(#arrowhead-red)" />
+    <text x="1070" y="810" font-size="9" fill="#ef4444" font-weight="700">PAUSE</text>
+
+    <!-- Webhook resume → Node 9 -->
+    <path d="M 960 870 L 680 870 L 680 780" class="connector-line orange dashed" marker-end="url(#arrowhead-orange)" />
+    <text x="770" y="865" font-size="9" fill="#f59e0b" font-weight="600">webhook resume</text>
+
+    <!-- Node 9 → Node 10 -->
+    <line x1="570" y1="770" x2="380" y2="770" class="connector-line" marker-end="url(#arrowhead)" />
+    <!-- Node 10 → END -->
+    <line x1="200" y1="790" x2="200" y2="830" class="connector-line" marker-end="url(#arrowhead)" />
+    <text x="210" y="825" font-size="10" fill="#333" font-weight="700">END</text>
+
+    <!-- Error paths -->
+    <path d="M 850 670 Q 860 720 1350 660 L 1350 750" class="connector-line red dashed" marker-end="url(#arrowhead-red)" />
+
+    <!-- LLM Layer → Pipeline (Node 2) -->
+    <path d="M 450 1060 L 450 560" class="connector-line green dashed" marker-end="url(#arrowhead-green)" />
+    <!-- LLM Layer → Pipeline (Node 3) -->
+    <path d="M 750 1060 L 780 560" class="connector-line green dashed" marker-end="url(#arrowhead-green)" />
+    <!-- LLM Layer → Pipeline (Node 6) -->
+    <path d="M 600 1060 L 600 690" class="connector-line purple dashed" marker-end="url(#arrowhead-purple)" />
+
+    <!-- KB → Pipeline (Node 4) -->
+    <path d="M 1150 1100 L 1120 560" class="connector-line dashed" marker-end="url(#arrowhead)" />
+
+    <!-- Storage ↔ Pipeline -->
+    <path d="M 1100 260 L 800 430" class="connector-line dashed blue" marker-end="url(#arrowhead-blue)" />
+
+    <!-- Observability connections -->
+    <path d="M 700 900 L 700 1560" class="connector-line red dashed" marker-end="url(#arrowhead-red)" />
+
+    <!-- Client → API -->
+    <path d="M 300 1500 L 300 1380" class="connector-line" marker-end="url(#arrowhead)" />
+  </svg>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 1: Email Source -->
+  <!-- ============================================================ -->
+  <div class="section email-source z2" style="left:20px; top:20px; width:380px; height:100px;">
+    <div class="section-title">
+      Email Source
+      <span class="tech-badge" style="background:#fef3c7; color:#92400e;">IMAP / Gmail / Outlook</span>
+    </div>
+    <div class="component" style="position:relative; display:flex; gap:16px; align-items:center;">
+      <div class="component-icon">📧</div>
+      <div>
+        <div class="component-title">Customer Inbox</div>
+        <div class="component-desc">IMAP SSL (port 993) / Gmail API / Microsoft Graph</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 2: Email Ingestion Pipeline -->
+  <!-- ============================================================ -->
+  <div class="section ingestion z2" style="left:20px; top:180px; width:780px; height:150px;">
+    <div class="section-title">
+      Email Ingestion Pipeline
+      <span class="tech-badge" style="background:#dcfce7; color:#166534;">AsyncIO Background Task</span>
+    </div>
+
+    <div class="pipe-step" style="left:20px; top:50px; width:130px;">
+      <div class="step-title">IMAP Poll</div>
+      <div class="step-desc">Every 60s<br>SEARCH UNSEEN</div>
+    </div>
+    <div class="pipe-step" style="left:170px; top:50px; width:130px;">
+      <div class="step-title">Parse MIME</div>
+      <div class="step-desc">Extract sender,<br>subject, body</div>
+    </div>
+    <div class="pipe-step" style="left:320px; top:50px; width:130px;">
+      <div class="step-title">Dedup Check</div>
+      <div class="step-desc">message_id<br>unique constraint</div>
+    </div>
+    <div class="pipe-step" style="left:470px; top:50px; width:130px;">
+      <div class="step-title">Store in DB</div>
+      <div class="step-desc">Create customer<br>+ email record</div>
+    </div>
+    <div class="pipe-step" style="left:620px; top:50px; width:130px;">
+      <div class="step-title">Trigger Pipeline</div>
+      <div class="step-desc">workflow<br>.ainvoke()</div>
+    </div>
+
+    <!-- Arrows between pipe steps -->
+    <svg style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;">
+      <line x1="152" y1="80" x2="170" y2="80" stroke="#4caf50" stroke-width="2" marker-end="url(#arrowhead-green)" />
+      <line x1="302" y1="80" x2="320" y2="80" stroke="#4caf50" stroke-width="2" marker-end="url(#arrowhead-green)" />
+      <line x1="452" y1="80" x2="470" y2="80" stroke="#4caf50" stroke-width="2" marker-end="url(#arrowhead-green)" />
+      <line x1="602" y1="80" x2="620" y2="80" stroke="#4caf50" stroke-width="2" marker-end="url(#arrowhead-green)" />
+    </svg>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 3: Storage Layer -->
+  <!-- ============================================================ -->
+  <div class="section storage z2" style="left:860px; top:20px; width:520px; height:290px;">
+    <div class="section-title">
+      Storage Layer
+      <span class="tech-badge" style="background:#dbeafe; color:#1e40af;">Docker Container</span>
+    </div>
+
+    <!-- PostgreSQL -->
+    <div class="component" style="left:20px; top:50px; width:230px; height:220px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <div style="font-size:20px;">🐘</div>
+        <div class="component-title" style="font-size:14px;">PostgreSQL</div>
+      </div>
+      <div style="font-size:10px; color:#555; line-height:1.8;">
+        <div style="background:#eff6ff; padding:4px 8px; border-radius:4px; margin-bottom:3px;"><b>customers</b> - id, email, name</div>
+        <div style="background:#eff6ff; padding:4px 8px; border-radius:4px; margin-bottom:3px;"><b>emails</b> - sender, subject, body, category, priority, confidence, status</div>
+        <div style="background:#eff6ff; padding:4px 8px; border-radius:4px; margin-bottom:3px;"><b>email_responses</b> - response_text, model_used, tokens_used</div>
+        <div style="background:#eff6ff; padding:4px 8px; border-radius:4px; margin-bottom:3px;"><b>human_reviews</b> - reason, status, approved_response</div>
+        <div style="background:#eff6ff; padding:4px 8px; border-radius:4px; margin-bottom:3px;"><b>followups</b> - type, scheduled_for</div>
+        <div style="background:#eff6ff; padding:4px 8px; border-radius:4px;"><b>kb_entries</b> - title, content, embedding</div>
+      </div>
+    </div>
+
+    <!-- SQLAlchemy ORM -->
+    <div class="component" style="left:270px; top:50px; width:230px; height:100px;">
+      <div class="component-title">SQLAlchemy ORM</div>
+      <div class="component-desc" style="line-height:1.6;">
+        DatabaseService (repository pattern)<br>
+        SessionLocal (connection pool)<br>
+        Alembic migrations<br>
+        <span style="color:#1e40af; font-weight:600;">src/services/db_service.py</span>
+      </div>
+    </div>
+
+    <!-- Enums -->
+    <div class="component" style="left:270px; top:170px; width:230px; height:100px;">
+      <div class="component-title">Status Enums</div>
+      <div class="component-desc" style="line-height:1.6;">
+        EmailStatusEnum: pending, processing, <b>awaiting_review</b>, responded, failed<br>
+        ReviewStatusEnum: pending, approved, rejected, escalated<br>
+        ReviewReasonEnum: 9 types (incl. churn_risk, angry_customer)
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 4: LangGraph 11-Node Pipeline -->
+  <!-- ============================================================ -->
+  <div class="section pipeline-section z2" style="left:20px; top:430px; width:1360px; height:430px;">
+    <div class="section-title">
+      LangGraph Agentic Pipeline (11 Nodes)
+      <span class="tech-badge" style="background:#fff7ed; color:#9a3412;">StateGraph + @traceable</span>
+      <span class="tech-badge" style="background:#fef3c7; color:#92400e;">src/graph/workflow.py</span>
+    </div>
+
+    <!-- Row 1: Nodes 1-4 -->
+    <div class="node logic-node" style="left:30px; top:65px; width:150px;">
+      <span class="num">1</span>
+      <div>
+        <div>email_retrieval</div>
+        <div style="font-size:9px; color:#888; font-weight:400;">Load from DB<br>No LLM call</div>
+      </div>
+    </div>
+
+    <div class="node slm-node" style="left:220px; top:65px; width:150px;">
+      <span class="num">2</span>
+      <div>
+        <div>classification</div>
+        <div style="font-size:9px; color:#888; font-weight:400;">LLM: Qwen3-8B<br>category + confidence</div>
+      </div>
+    </div>
+
+    <div class="node slm-node" style="left:420px; top:65px; width:180px;">
+      <span class="num">3</span>
+      <div>
+        <div>sentiment_analysis</div>
+        <div style="font-size:9px; color:#888; font-weight:400;">LLM: Qwen3-8B<br>tone, churn_risk, score</div>
+      </div>
+    </div>
+
+    <div class="node logic-node" style="left:650px; top:65px; width:170px;">
+      <span class="num">4</span>
+      <div>
+        <div>context_analysis</div>
+        <div style="font-size:9px; color:#888; font-weight:400;">FAISS search + history<br>No LLM call</div>
+      </div>
+    </div>
+
+    <!-- Row 2: Nodes 5-8 -->
+    <div class="node logic-node" style="left:30px; top:190px; width:160px;">
+      <span class="num">5</span>
+      <div>
+        <div>review_check</div>
+        <div style="font-size:9px; color:#888; font-weight:400;">8 rules engine<br>No LLM call</div>
+      </div>
+    </div>
+
+    <div class="node llm-node" style="left:230px; top:190px; width:190px;">
+      <span class="num">6</span>
+      <div>
+        <div>response_generation</div>
+        <div style="font-size:9px; color:#888; font-weight:400;">LLM: Claude Sonnet 4.6<br>Customer-facing response</div>
+      </div>
+    </div>
+
+    <!-- Conditional split box -->
+    <div style="position:absolute; left:460px; top:200px; width:100px; height:50px; background:white; border:2px solid #f59e0b; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#b45309; z-index:3;">
+      needs_review?
+    </div>
+
+    <div class="node logic-node" style="left:600px; top:190px; width:160px;">
+      <span class="num">7</span>
+      <div>
+        <div>review_routing</div>
+        <div style="font-size:9px; color:#888; font-weight:400;">Create HumanReview<br>in DB</div>
+      </div>
+    </div>
+
+    <div class="node hitl-node" style="left:800px; top:190px; width:180px;">
+      <span class="num">8</span>
+      <div>
+        <div>human_review (HITL)</div>
+        <div style="font-size:9px; color:#888; font-weight:400;">AWAITING_REVIEW<br>Workflow PAUSES here</div>
+      </div>
+    </div>
+
+    <!-- PAUSE indicator -->
+    <div style="position:absolute; left:850px; top:270px; padding:4px 12px; background:#fef2f2; border:2px solid #ef4444; border-radius:8px; font-size:10px; font-weight:700; color:#dc2626; z-index:3;">
+      WORKFLOW PAUSED - Waiting for webhook
+    </div>
+
+    <!-- Row 3: Nodes 9-11 -->
+    <div class="node logic-node" style="left:230px; top:310px; width:170px;">
+      <span class="num">9</span>
+      <div>
+        <div>response_sending</div>
+        <div style="font-size:9px; color:#888; font-weight:400;">SMTP send + DB update<br>No LLM call</div>
+      </div>
+    </div>
+
+    <div class="node logic-node" style="left:30px; top:310px; width:170px;">
+      <span class="num">10</span>
+      <div>
+        <div>followup_scheduling</div>
+        <div style="font-size:9px; color:#888; font-weight:400;">6 rules → scheduled tasks<br>No LLM call</div>
+      </div>
+    </div>
+
+    <div class="node" style="left:1100px; top:250px; width:150px; border-color:#ef4444; background:#fef2f2;">
+      <span class="num" style="background:#ef4444;">11</span>
+      <div>
+        <div>error_handler</div>
+        <div style="font-size:9px; color:#888; font-weight:400;">Log + status: FAILED<br>Reachable from any node</div>
+      </div>
+    </div>
+
+    <!-- END markers -->
+    <div style="position:absolute; left:80px; top:385px; padding:4px 16px; background:#333; color:white; border-radius:6px; font-size:11px; font-weight:700;">END</div>
+    <div style="position:absolute; left:1150px; top:320px; padding:4px 16px; background:#333; color:white; border-radius:6px; font-size:11px; font-weight:700;">END</div>
+
+    <!-- Internal arrows -->
+    <svg style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2;">
+      <!-- Row 1 arrows -->
+      <line x1="182" y1="100" x2="218" y2="100" stroke="#999" stroke-width="2" marker-end="url(#arrowhead)" />
+      <line x1="372" y1="100" x2="418" y2="100" stroke="#10b981" stroke-width="2" marker-end="url(#arrowhead-green)" />
+      <line x1="602" y1="100" x2="648" y2="100" stroke="#999" stroke-width="2" marker-end="url(#arrowhead)" />
+      <!-- Row 1 → Row 2 -->
+      <path d="M 820 120 L 850 120 L 850 160 L 30 160 L 30 188" stroke="#999" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+      <!-- Row 2 internal -->
+      <line x1="192" y1="220" x2="228" y2="220" stroke="#8b5cf6" stroke-width="2" marker-end="url(#arrowhead-purple)" />
+      <line x1="422" y1="220" x2="458" y2="220" stroke="#999" stroke-width="2" marker-end="url(#arrowhead)" />
+      <!-- From decision: YES to Node 7 -->
+      <line x1="562" y1="220" x2="598" y2="220" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrowhead-orange)" />
+      <!-- Node 7 → Node 8 -->
+      <line x1="762" y1="220" x2="798" y2="220" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrowhead-orange)" />
+      <!-- From decision: NO to Node 9 -->
+      <path d="M 510 252 L 510 340 L 402 340" stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#arrowhead-green)" />
+      <text x="460" y="295" font-size="9" fill="#10b981" font-weight="600">NO (auto-send)</text>
+      <!-- Webhook resume to Node 9 -->
+      <path d="M 870 300 L 870 340 L 402 340" stroke="#f59e0b" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#arrowhead-orange)" />
+      <!-- Node 9 → Node 10 -->
+      <line x1="228" y1="340" x2="202" y2="340" stroke="#999" stroke-width="2" marker-end="url(#arrowhead)" />
+      <!-- Node 10 → END -->
+      <line x1="100" y1="365" x2="100" y2="383" stroke="#999" stroke-width="2" marker-end="url(#arrowhead)" />
+      <!-- Error handler → END -->
+      <line x1="1175" y1="306" x2="1175" y2="318" stroke="#ef4444" stroke-width="2" marker-end="url(#arrowhead-red)" />
+    </svg>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 5: HITL Review Layer -->
+  <!-- ============================================================ -->
+  <div class="section hitl-section z2" style="left:860px; top:870px; width:520px; height:200px;">
+    <div class="section-title">
+      Human-in-the-Loop (HITL) Review
+      <span class="tech-badge" style="background:#fef3c7; color:#92400e;">Webhook API</span>
+    </div>
+
+    <div class="component" style="left:20px; top:50px; width:150px; height:130px;">
+      <div class="component-icon">👤</div>
+      <div class="component-title">Review Dashboard</div>
+      <div class="component-desc" style="line-height:1.5;">
+        /ui/reviews<br>
+        View email + AI response<br>
+        Edit response text<br>
+        Approve / Reject / Escalate
+      </div>
+    </div>
+
+    <div class="component" style="left:190px; top:50px; width:150px; height:130px;">
+      <div class="component-icon">🔗</div>
+      <div class="component-title">Webhook Endpoints</div>
+      <div class="component-desc" style="line-height:1.5;">
+        POST /api/reviews/{id}/<b>approve</b><br>
+        POST /api/reviews/{id}/<b>reject</b><br>
+        POST /api/reviews/{id}/<b>escalate</b><br>
+        GET /api/reviews/<b>pending</b>
+      </div>
+    </div>
+
+    <div class="component" style="left:360px; top:50px; width:140px; height:130px;">
+      <div class="component-icon">▶️</div>
+      <div class="component-title">Pipeline Resume</div>
+      <div class="component-desc" style="line-height:1.5;">
+        On approve:<br>
+        → response_sending<br>
+        → followup_scheduling<br>
+        <br>On reject:<br>
+        → status: FAILED
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 6: LLM Generation Layer -->
+  <!-- ============================================================ -->
+  <div class="section llm-layer z2" style="left:20px; top:870px; width:800px; height:260px;">
+    <div class="section-title">
+      LLM Generation Layer
+      <span class="tech-badge" style="background:#f3e8ff; color:#6b21a8;">Dual Model Routing</span>
+    </div>
+
+    <!-- vLLM -->
+    <div class="component" style="left:20px; top:55px; width:210px; height:180px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+        <div style="background:#10b981; color:white; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:700;">vLLM</div>
+        <span style="font-size:10px; color:#666;">Docker Container</span>
+      </div>
+      <div class="component-title" style="font-size:14px; color:#10b981;">Qwen3-8B (SLM)</div>
+      <div class="component-desc" style="line-height:1.6; margin-top:6px;">
+        <b>Tasks:</b><br>
+        - Email classification (Node 2)<br>
+        - Sentiment analysis (Node 3)<br><br>
+        <b>Why SLM is enough:</b><br>
+        - Structured output (JSON)<br>
+        - Bounded categories<br>
+        - Fast: ~0.3-0.8s/call<br>
+        - Free (self-hosted GPU)
+      </div>
+    </div>
+
+    <!-- LiteLLM -->
+    <div class="component" style="left:260px; top:55px; width:220px; height:180px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+        <div style="background:#f59e0b; color:white; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:700;">LiteLLM</div>
+        <span style="font-size:10px; color:#666;">Proxy Container</span>
+      </div>
+      <div class="component-title" style="font-size:14px; color:#f59e0b;">Unified Router</div>
+      <div class="component-desc" style="line-height:1.6; margin-top:6px;">
+        <b>OpenAI-compatible API</b> (:4000/v1)<br><br>
+        <b>Routing:</b><br>
+        - Primary: vLLM (Qwen3-8B)<br>
+        - Fallback: Anthropic API<br><br>
+        <b>Features:</b><br>
+        - Load balancing<br>
+        - Retry logic<br>
+        - litellm_config.yaml
+      </div>
+    </div>
+
+    <!-- Claude -->
+    <div class="component" style="left:510px; top:55px; width:260px; height:180px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+        <div style="background:#8b5cf6; color:white; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:700;">Anthropic API</div>
+        <span style="font-size:10px; color:#666;">External</span>
+      </div>
+      <div class="component-title" style="font-size:14px; color:#8b5cf6;">Claude Sonnet 4.6 (LLM)</div>
+      <div class="component-desc" style="line-height:1.6; margin-top:6px;">
+        <b>Tasks:</b><br>
+        - Response generation (Node 6)<br>
+        - Fallback for failed SLM calls<br><br>
+        <b>Why LLM is needed:</b><br>
+        - Free-form customer-facing text<br>
+        - Tone awareness (empathy, retention)<br>
+        - Synthesizes all context<br>
+        - Company reputation on the line<br>
+        - ~2-4s/call, ~$0.02-0.04/email
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 7: Knowledge Base -->
+  <!-- ============================================================ -->
+  <div class="section kb-section z2" style="left:860px; top:1100px; width:520px; height:150px;">
+    <div class="section-title">
+      Knowledge Base & Embeddings
+      <span class="tech-badge" style="background:#ecfdf5; color:#065f46;">FAISS + OpenAI</span>
+    </div>
+
+    <div class="component" style="left:20px; top:50px; width:230px; height:80px;">
+      <div class="component-title">FAISS Vector Store</div>
+      <div class="component-desc" style="line-height:1.5;">
+        In-memory vector similarity search<br>
+        KB articles chunked + embedded<br>
+        Used by Node 4 (context_analysis)
+      </div>
+    </div>
+
+    <div class="component" style="left:270px; top:50px; width:230px; height:80px;">
+      <div class="component-title">OpenAI Embeddings</div>
+      <div class="component-desc" style="line-height:1.5;">
+        text-embedding-ada-002<br>
+        Embeds KB articles + queries<br>
+        Cosine similarity matching
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 8: API Layer -->
+  <!-- ============================================================ -->
+  <div class="section api-layer z2" style="left:20px; top:1170px; width:800px; height:200px;">
+    <div class="section-title">
+      API Layer
+      <span class="tech-badge" style="background:#dcfce7; color:#166534;">FastAPI</span>
+      <span class="tech-badge" style="background:#dbeafe; color:#1e40af;">:8000</span>
+    </div>
+
+    <div class="component" style="left:20px; top:55px; width:170px; height:120px;">
+      <div class="component-title">Email Endpoints</div>
+      <div class="component-desc" style="line-height:1.6;">
+        POST /api/emails/<b>test</b><br>
+        GET /api/emails<br>
+        GET /api/emails/{id}<br>
+        <br>
+        <span style="color:#16a34a;">src/api/routes/emails.py</span>
+      </div>
+    </div>
+
+    <div class="component" style="left:210px; top:55px; width:170px; height:120px;">
+      <div class="component-title">Review Endpoints</div>
+      <div class="component-desc" style="line-height:1.6;">
+        GET /api/reviews/<b>pending</b><br>
+        POST .../approve<br>
+        POST .../reject<br>
+        POST .../escalate<br>
+        <span style="color:#16a34a;">src/api/routes/reviews.py</span>
+      </div>
+    </div>
+
+    <div class="component" style="left:400px; top:55px; width:170px; height:120px;">
+      <div class="component-title">Metrics Endpoints</div>
+      <div class="component-desc" style="line-height:1.6;">
+        GET /api/metrics/<b>overview</b><br>
+        GET .../category-distribution<br>
+        GET .../confidence-analysis<br>
+        GET .../daily-trend<br>
+        <span style="color:#16a34a;">src/api/routes/metrics.py</span>
+      </div>
+    </div>
+
+    <div class="component" style="left:590px; top:55px; width:170px; height:120px;">
+      <div class="component-title">Health & Misc</div>
+      <div class="component-desc" style="line-height:1.6;">
+        GET /health<br>
+        GET /docs (Swagger)<br>
+        CORS middleware<br>
+        Jinja2 templates<br>
+        <span style="color:#16a34a;">src/api/app.py</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 9: Client Interface -->
+  <!-- ============================================================ -->
+  <div class="section client-section z2" style="left:20px; top:1400px; width:520px; height:190px;">
+    <div class="section-title">
+      Client Interface (Web UI)
+      <span class="tech-badge" style="background:#ccfbf1; color:#0f766e;">Jinja2 + Tailwind + HTMX</span>
+    </div>
+
+    <div class="component" style="left:20px; top:50px; width:110px; height:110px;">
+      <div class="component-icon">✉️</div>
+      <div class="component-title">Test Email</div>
+      <div class="component-desc">/ui/test<br>Submit test emails<br>See pipeline results</div>
+    </div>
+
+    <div class="component" style="left:150px; top:50px; width:100px; height:110px;">
+      <div class="component-icon">📥</div>
+      <div class="component-title">Inbox</div>
+      <div class="component-desc">/ui/inbox<br>All emails<br>Status + filters</div>
+    </div>
+
+    <div class="component" style="left:270px; top:50px; width:100px; height:110px;">
+      <div class="component-icon">👁️</div>
+      <div class="component-title">Reviews</div>
+      <div class="component-desc">/ui/reviews<br>HITL dashboard<br>Approve/Reject</div>
+    </div>
+
+    <div class="component" style="left:390px; top:50px; width:100px; height:110px;">
+      <div class="component-icon">📊</div>
+      <div class="component-title">Metrics</div>
+      <div class="component-desc">/ui/metrics<br>Charts (Chart.js)<br>KPIs + trends</div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 10: Observability Layer -->
+  <!-- ============================================================ -->
+  <div class="section observability z2" style="left:580px; top:1400px; width:800px; height:190px;">
+    <div class="section-title">
+      Observability Layer
+      <span class="tech-badge" style="background:#fce7f3; color:#9d174d;">Tracing + Monitoring</span>
+    </div>
+
+    <div class="component" style="left:20px; top:50px; width:230px; height:110px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+        <div style="background:#e91e63; color:white; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:700;">LangSmith</div>
+      </div>
+      <div class="component-title">Pipeline Tracing</div>
+      <div class="component-desc" style="line-height:1.5;">
+        @traceable on all 11 nodes<br>
+        wrap_openai() for LLM call capture<br>
+        Prompts, completions, tokens, latency<br>
+        <span style="color:#c2185b;">src/core/tracing.py</span>
+      </div>
+    </div>
+
+    <div class="component" style="left:270px; top:50px; width:230px; height:110px;">
+      <div class="component-title">Metrics Dashboard</div>
+      <div class="component-desc" style="line-height:1.5;">
+        Category distribution (donut chart)<br>
+        Confidence score trend (line chart)<br>
+        Review reasons breakdown (bar)<br>
+        Auto-send rate, approval rate<br>
+        <b>Confidence improvement recommendations</b>
+      </div>
+    </div>
+
+    <div class="component" style="left:520px; top:50px; width:250px; height:110px;">
+      <div class="component-title">What Gets Traced</div>
+      <div class="component-desc" style="line-height:1.5;">
+        <span style="background:#fce7f3; padding:1px 6px; border-radius:3px;">Node execution</span> inputs/outputs, timing<br>
+        <span style="background:#fce7f3; padding:1px 6px; border-radius:3px;">LLM calls</span> prompts, completions, tokens<br>
+        <span style="background:#fce7f3; padding:1px 6px; border-radius:3px;">Workflow</span> state transitions, routing<br>
+        <span style="background:#fce7f3; padding:1px 6px; border-radius:3px;">Errors</span> stack traces, failed nodes
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 11: Docker Infrastructure -->
+  <!-- ============================================================ -->
+  <div class="section z2" style="left:20px; top:1630px; width:1360px; height:180px; border-color:#64748b; background:rgba(100,116,139,0.05);">
+    <div class="section-title" style="color:#334155;">
+      Docker Compose Infrastructure
+      <span class="tech-badge" style="background:#f1f5f9; color:#334155;">4 Containers</span>
+      <span class="tech-badge" style="background:#f1f5f9; color:#334155;">docker-compose.yml</span>
+    </div>
+
+    <div class="component" style="left:20px; top:50px; width:280px; height:100px; background:#f0fdf4; border-color:#10b981;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="background:#10b981; color:white; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:700;">GPU</div>
+        <div class="component-title">vLLM Container</div>
+      </div>
+      <div class="component-desc" style="line-height:1.5;">
+        Image: vllm/vllm-openai<br>
+        Model: Qwen/Qwen3-8B<br>
+        Port: 8080 (OpenAI-compatible API)<br>
+        GPU: NVIDIA (--gpus all)
+      </div>
+    </div>
+
+    <div class="component" style="left:320px; top:50px; width:280px; height:100px; background:#fffbeb; border-color:#f59e0b;">
+      <div class="component-title">LiteLLM Container</div>
+      <div class="component-desc" style="line-height:1.5;">
+        Image: ghcr.io/berriai/litellm<br>
+        Port: 4000 (proxy)<br>
+        Config: litellm_config.yaml<br>
+        Routes: vLLM primary → Claude fallback
+      </div>
+    </div>
+
+    <div class="component" style="left:620px; top:50px; width:280px; height:100px; background:#eff6ff; border-color:#3b82f6;">
+      <div class="component-title">PostgreSQL Container</div>
+      <div class="component-desc" style="line-height:1.5;">
+        Image: postgres:15<br>
+        Port: 5432<br>
+        Volume: pgdata (persistent)<br>
+        6 tables (see Storage Layer)
+      </div>
+    </div>
+
+    <div class="component" style="left:920px; top:50px; width:280px; height:100px; background:#faf5ff; border-color:#8b5cf6;">
+      <div class="component-title">App Container</div>
+      <div class="component-desc" style="line-height:1.5;">
+        Dockerfile (Python 3.11)<br>
+        Port: 8000 (FastAPI + Uvicorn)<br>
+        Connects to: LiteLLM:4000, PostgreSQL:5432<br>
+        Env: LangSmith keys, OPENAI_API_KEY
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- LEGEND -->
+  <!-- ============================================================ -->
+  <div style="position:absolute; left:20px; top:1840px; display:flex; gap:24px; align-items:center; flex-wrap:wrap;">
+    <span style="font-size:12px; font-weight:700; color:#333;">Legend:</span>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#f0fdf4; border-color:#10b981;"></div>
+      <span style="font-size:11px;">SLM Node (Qwen3-8B via vLLM)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#f5f3ff; border-color:#8b5cf6;"></div>
+      <span style="font-size:11px;">LLM Node (Claude Sonnet 4.6)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#f9fafb; border-color:#6b7280;"></div>
+      <span style="font-size:11px;">Logic Node (No LLM call)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#fffbeb; border-color:#f59e0b;"></div>
+      <span style="font-size:11px;">HITL Node (Human Review)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#fef2f2; border-color:#ef4444;"></div>
+      <span style="font-size:11px;">Error Path</span>
+    </div>
+    <div style="font-size:11px; color:#999;">
+      ── Solid: Data flow &nbsp; - - Dashed: Async/optional connection
+    </div>
+  </div>
+
+  <!-- File structure reference -->
+  <div class="component z2" style="left:20px; top:1880px; width:1360px; padding:20px;">
+    <div class="component-title" style="font-size:14px; margin-bottom:12px;">Project File Structure</div>
+    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; font-size:10px; line-height:1.6;">
+      <div>
+        <div style="font-weight:700; color:#333; margin-bottom:4px;">Core</div>
+        <div style="color:#666;">
+          src/core/config.py<br>
+          src/core/logging.py<br>
+          src/core/tracing.py<br>
+          src/db/database.py<br>
+          src/db/models.py
+        </div>
+      </div>
+      <div>
+        <div style="font-weight:700; color:#333; margin-bottom:4px;">Graph & Nodes</div>
+        <div style="color:#666;">
+          src/graph/state.py<br>
+          src/graph/workflow.py<br>
+          src/nodes/factory.py<br>
+          src/nodes/classification.py<br>
+          src/nodes/sentiment_analysis.py<br>
+          src/nodes/response_generation.py<br>
+          + 8 more node files
+        </div>
+      </div>
+      <div>
+        <div style="font-weight:700; color:#333; margin-bottom:4px;">API & Services</div>
+        <div style="color:#666;">
+          src/api/app.py<br>
+          src/api/routes/emails.py<br>
+          src/api/routes/reviews.py<br>
+          src/api/routes/metrics.py<br>
+          src/services/llm_service.py<br>
+          src/services/db_service.py<br>
+          src/services/email_service.py
+        </div>
+      </div>
+      <div>
+        <div style="font-weight:700; color:#333; margin-bottom:4px;">UI & Config</div>
+        <div style="color:#666;">
+          src/templates/base.html<br>
+          src/templates/test_email.html<br>
+          src/templates/inbox.html<br>
+          src/templates/reviews.html<br>
+          src/templates/metrics.html<br>
+          docker-compose.yml<br>
+          litellm_config.yaml<br>
+          .env.example
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
