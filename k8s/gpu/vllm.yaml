@@ -29,22 +29,328 @@ spec:
         - name: vllm
           image: vllm/vllm-openai:latest
           args:
+            # ══════════════════════════════════════════════════════════════
+            # MODEL CONFIGURATION
+            # ══════════════════════════════════════════════════════════════
+
             - "--model"
-            - "Qwen/Qwen3-8B-AWQ"         # 4-bit quantized (~8GB VRAM)
+            - "Qwen/Qwen3-8B-AWQ"         # HuggingFace model ID or local path
+                                            # Examples: "meta-llama/Llama-3-8B-Instruct"
+                                            #           "/models/my-finetuned-model"
+                                            #           "mistralai/Mistral-7B-Instruct-v0.3"
+
+            # - "--tokenizer"              # Custom tokenizer (if different from model)
+            #   - "Qwen/Qwen3-8B"          # Default: same as --model
+
+            # - "--revision"               # Specific model revision/commit hash
+            #   - "main"                   # Default: "main". Use for pinning versions
+                                            # Example: "refs/pr/42" or "abc123def"
+
+            # - "--tokenizer-revision"     # Specific tokenizer revision (if different)
+            #   - "main"
+
+            # - "--trust-remote-code"      # Allow running custom model code from HuggingFace
+                                            # Required for some models (Qwen, Phi, etc.)
+                                            # Security risk: only use with trusted models
+
+            # - "--download-dir"           # Directory to download and cache model files
+            #   - "/models/cache"          # Default: HuggingFace default (~/.cache/huggingface)
+
+            # - "--seed"                   # Random seed for reproducibility
+            #   - "42"                     # Default: 0
+
+            # ══════════════════════════════════════════════════════════════
+            # SERVER CONFIGURATION
+            # ══════════════════════════════════════════════════════════════
+
             - "--port"
-            - "8001"
-            - "--max-model-len"
-            - "8192"
+            - "8001"                        # API server port
+                                            # Default: 8000
+
+            # - "--host"                   # Bind address
+            #   - "0.0.0.0"               # Default: "0.0.0.0" (all interfaces)
+
+            # - "--api-key"                # Require API key for authentication
+            #   - "my-secret-key"          # Clients must send: Authorization: Bearer my-secret-key
+                                            # Default: None (no auth required)
+
+            # - "--served-model-name"      # Override model name in API responses
+            #   - "customer-support-v1"    # Useful for abstraction: clients call "customer-support-v1"
+                                            # instead of "Qwen/Qwen3-8B-AWQ"
+                                            # Can specify multiple: "name1,name2"
+
+            # - "--response-role"          # Role name in chat completions response
+            #   - "assistant"              # Default: "assistant"
+
+            # - "--chat-template"          # Custom Jinja2 chat template
+            #   - "/templates/custom.jinja"  # Override model's built-in chat template
+                                              # Useful for custom system prompts or formatting
+
+            # ══════════════════════════════════════════════════════════════
+            # QUANTIZATION
+            # Reduces model size by lowering weight precision
+            # Trades small quality loss for significant VRAM savings
+            # ══════════════════════════════════════════════════════════════
+
             - "--quantization"
-            - "awq"
+            - "awq"                         # Quantization method to use
+                                            # Options:
+                                            #   "awq"      — Activation-aware Weight Quantization (4-bit)
+                                            #                 Best balance of quality vs compression
+                                            #                 Model must be pre-quantized (e.g., *-AWQ)
+                                            #
+                                            #   "gptq"     — GPTQ quantization (4-bit)
+                                            #                 Similar to AWQ, slightly older method
+                                            #                 Model must be pre-quantized (e.g., *-GPTQ)
+                                            #
+                                            #   "squeezellm" — SqueezeLLM (mixed precision)
+                                            #                  Less common, experimental
+                                            #
+                                            #   "fp8"      — 8-bit floating point (Hopper GPUs: H100/H200)
+                                            #                 Better quality than 4-bit, needs hardware support
+                                            #                 No pre-quantization needed — done on-the-fly
+                                            #
+                                            #   "bitsandbytes" — BitsAndBytes (4-bit/8-bit)
+                                            #                    Load any model in 4-bit without pre-quantization
+                                            #                    Slower inference than AWQ/GPTQ
+                                            #
+                                            #   "gguf"     — GGUF format (llama.cpp compatible)
+                                            #                 Various quant levels: Q4_K_M, Q5_K_M, etc.
+                                            #
+                                            #   None       — No quantization (full FP16/BF16 precision)
+
+            # - "--dtype"                  # Data type for model weights
+            #   - "auto"                   # Options: "auto", "half", "float16", "bfloat16", "float32"
+                                            # Default: "auto" (uses model config)
+                                            # "bfloat16" recommended for Ampere+ GPUs (RTX 30xx, A100, H100)
+                                            # "float16" for older GPUs (V100, T4)
+
+            # ══════════════════════════════════════════════════════════════
+            # GPU MEMORY MANAGEMENT
+            # Controls how vLLM allocates and uses GPU VRAM
+            # ══════════════════════════════════════════════════════════════
+
             - "--gpu-memory-utilization"
-            - "0.90"                        # Use 90% of GPU memory
+            - "0.90"                        # Fraction of GPU memory to use (0.0 to 1.0)
+                                            # Formula: KV cache size = (total VRAM × this value) - model size
+                                            # Example: 24GB GPU × 0.90 = 21.6GB → 21.6 - 8GB model = 13.6GB for KV cache
+                                            # Higher = more concurrent requests, but risk of OOM
+                                            # Lower = fewer concurrent requests, but more stable
+                                            # Recommended: 0.85 (safe) to 0.95 (aggressive)
+
+            - "--max-model-len"
+            - "8192"                        # Maximum sequence length (input + output tokens)
+                                            # Longer = more memory per request = fewer concurrent requests
+                                            # Must be ≤ model's max context window
+                                            # Qwen3-8B supports up to 32768, but we limit to 8192
+                                            # for email classification (short inputs, short outputs)
+
+            # - "--enforce-eager"          # Disable CUDA graph compilation
+                                            # CUDA graphs pre-compile computation patterns for speed
+                                            # But compilation takes 2-10 min at startup + extra memory
+                                            # Use this flag when:
+                                            #   - Debugging (eager mode gives better error messages)
+                                            #   - Low VRAM (saves ~500MB)
+                                            #   - Fast startup needed (skips compilation)
+                                            # Trade-off: ~10-20% slower inference
+
+            # - "--swap-space"             # CPU swap space for KV cache overflow (in GB)
+            #   - "4"                      # Default: 4 GB
+                                            # When GPU KV cache is full, spill to CPU RAM
+                                            # Increases capacity but adds latency for swapped sequences
+                                            # Set to 0 to disable swapping entirely
+
+            # - "--kv-cache-dtype"         # Data type for KV cache
+            #   - "auto"                   # Options: "auto", "fp8", "fp8_e5m2", "fp8_e4m3"
+                                            # Default: "auto" (same as model dtype)
+                                            # "fp8" halves KV cache memory → 2x more concurrent requests
+                                            # Only on Hopper GPUs (H100/H200)
+
+            # - "--block-size"             # Token block size for PagedAttention
+            #   - "16"                     # Default: 16. Options: 8, 16, 32
+                                            # Smaller = less wasted memory, more overhead
+                                            # Larger = less overhead, more memory waste
+                                            # Usually leave at default
+
+            # ══════════════════════════════════════════════════════════════
+            # BATCHING & THROUGHPUT
+            # Controls how vLLM groups multiple requests together
+            # ══════════════════════════════════════════════════════════════
+
             - "--max-num-batched-tokens"
-            - "16384"                       # Continuous batching capacity
+            - "16384"                       # Max tokens processed in one batch iteration
+                                            # Higher = better GPU utilization, higher throughput
+                                            # Lower = lower latency for individual requests
+                                            # Must be ≥ max-model-len
+                                            # Rule of thumb: 2x to 4x of max-model-len
+
             - "--max-num-seqs"
-            - "64"                          # Max concurrent sequences
-            - "--enable-prefix-caching"     # Cache common prompt prefixes
-            - "--disable-log-requests"      # Reduce log noise in production
+            - "64"                          # Max concurrent sequences (requests) in a batch
+                                            # Higher = more concurrent users served
+                                            # Limited by GPU memory (each seq needs KV cache)
+                                            # Default: 256. Reduce for low-VRAM GPUs
+
+            # - "--max-paddings"           # Max padding tokens in a batch
+            #   - "256"                    # Default: 256
+                                            # Padding aligns sequences to same length in a batch
+                                            # Higher = more flexible batching, some wasted compute
+
+            # - "--enable-chunked-prefill" # Split long prefills into chunks
+                                            # Interleaves prefill (processing input) and decode (generating output)
+                                            # Benefits:
+                                            #   - Lower time-to-first-token (TTFT) for short requests
+                                            #   - Long inputs don't block other requests
+                                            # Trade-off: slightly lower overall throughput
+
+            # - "--max-num-on-the-fly-requests"  # Max requests queued before rejecting
+            #   - "256"                    # Default: depends on backend
+                                            # Prevents unbounded queue growth under load
+
+            # ══════════════════════════════════════════════════════════════
+            # CACHING
+            # Reuse computation to speed up repeated/similar requests
+            # ══════════════════════════════════════════════════════════════
+
+            - "--enable-prefix-caching"     # Cache KV values for common prompt prefixes
+                                            # How it works:
+                                            #   1. First request: "System: You are a classifier..." (compute KV)
+                                            #   2. Subsequent requests with same prefix: skip KV computation
+                                            # Perfect for:
+                                            #   - Shared system prompts (our classification prompt)
+                                            #   - Few-shot examples that repeat
+                                            #   - RAG with common context
+                                            # Memory cost: caches stay in KV cache memory
+                                            # Automatic eviction when memory is full (LRU)
+
+            # ══════════════════════════════════════════════════════════════
+            # PARALLEL EXECUTION
+            # Split model across multiple GPUs or use speculative decoding
+            # ══════════════════════════════════════════════════════════════
+
+            # - "--tensor-parallel-size"   # Number of GPUs for tensor parallelism
+            #   - "1"                      # Default: 1 (single GPU)
+                                            # Set to 2 for 2 GPUs, 4 for 4 GPUs, etc.
+                                            # Splits model layers across GPUs
+                                            # Requires: NCCL + shared memory (/dev/shm)
+                                            # Use when: model doesn't fit on 1 GPU
+                                            # Example: Llama-70B needs TP=4 on A100-40GB
+
+            # - "--pipeline-parallel-size" # Number of GPUs for pipeline parallelism
+            #   - "1"                      # Default: 1
+                                            # Splits model by layer groups across GPUs
+                                            # Less efficient than tensor parallel but works across nodes
+                                            # Usually: tensor parallel within a node, pipeline across nodes
+
+            # - "--data-parallel-size"     # Number of data parallel replicas
+            #   - "1"                      # Default: 1
+                                            # Each replica has full model copy
+                                            # Multiplies throughput linearly
+                                            # Requires: GPUs = tensor_parallel × data_parallel
+
+            # - "--speculative-model"      # Draft model for speculative decoding
+            #   - "Qwen/Qwen3-0.6B"       # Small model generates candidate tokens
+                                            # Large model verifies in parallel
+                                            # Speed-up: 1.5-2.5x for generation-heavy tasks
+                                            # Best when: draft model is 5-10x smaller than main model
+
+            # - "--num-speculative-tokens" # How many tokens the draft model proposes
+            #   - "5"                      # Default: depends on model
+                                            # Higher = more aggressive speculation
+                                            # Too high = wasted computation on rejections
+
+            # - "--speculative-disable-by-batch-size"  # Disable speculation when batch is large
+            #   - "4"                      # When batch size ≥ this, skip speculative decoding
+                                            # Speculation helps latency but hurts throughput at scale
+
+            # ══════════════════════════════════════════════════════════════
+            # DECODING & OUTPUT CONTROL
+            # Controls how tokens are generated
+            # ══════════════════════════════════════════════════════════════
+
+            # - "--max-logprobs"           # Max number of logprobs to return per token
+            #   - "20"                     # Default: 20
+                                            # Our app uses top_logprobs=5 for confidence scoring
+                                            # Set higher if you need more alternatives
+
+            # - "--guided-decoding-backend"  # Backend for structured output
+            #   - "outlines"               # Options: "outlines", "lm-format-enforcer"
+                                            # Constrains output to match a schema
+                                            # Example: force JSON output matching a Pydantic model
+                                            # Used via API: guided_json, guided_regex, guided_choice
+
+            # ══════════════════════════════════════════════════════════════
+            # LORA ADAPTER SUPPORT
+            # Serve multiple fine-tuned LoRA adapters on one base model
+            # ══════════════════════════════════════════════════════════════
+
+            # - "--enable-lora"            # Enable LoRA adapter loading
+                                            # Allows serving multiple fine-tuned variants
+                                            # Base model stays in GPU, adapters are tiny (~10-50MB)
+                                            # Clients specify adapter via model name in API call
+
+            # - "--lora-modules"           # Register LoRA adapters
+            #   - "classifier=/adapters/email-classifier"
+            #   - "responder=/adapters/email-responder"
+                                            # Format: "name=path" or "name=path=base_model"
+                                            # Clients call: model="classifier" or model="responder"
+                                            # All share the same base model in GPU memory
+
+            # - "--max-loras"              # Max LoRA adapters loaded simultaneously
+            #   - "4"                      # Default: 1
+                                            # Each adapter uses small additional GPU memory
+                                            # LRU eviction when limit reached
+
+            # - "--max-lora-rank"          # Maximum LoRA rank supported
+            #   - "64"                     # Default: 16
+                                            # Higher rank = more adapter capacity, more memory
+                                            # Must be ≥ rank used during training
+
+            # ══════════════════════════════════════════════════════════════
+            # LOGGING & OBSERVABILITY
+            # ══════════════════════════════════════════════════════════════
+
+            - "--disable-log-requests"      # Don't log every API request
+                                            # Reduces log noise in production
+                                            # Remove this flag during debugging
+
+            # - "--disable-log-stats"      # Don't log periodic throughput stats
+                                            # Stats include: tokens/sec, queue depth, cache hit rate
+
+            # - "--uvicorn-log-level"      # Uvicorn (HTTP server) log level
+            #   - "warning"                # Options: "debug", "info", "warning", "error", "critical"
+                                            # Default: "info"
+
+            # - "--otlp-traces-endpoint"   # OpenTelemetry endpoint for distributed tracing
+            #   - "http://jaeger:4318/v1/traces"
+                                            # Sends trace data to Jaeger/Tempo/etc.
+                                            # Useful for end-to-end latency analysis
+
+            # ══════════════════════════════════════════════════════════════
+            # ADVANCED / EXPERIMENTAL
+            # ══════════════════════════════════════════════════════════════
+
+            # - "--enable-auto-tool-choice"  # Let model decide when to use tools
+                                              # For function calling / tool use support
+                                              # Model must support tool calling
+
+            # - "--tool-call-parser"        # Parser for tool call format
+            #   - "hermes"                  # Options: "mistral", "hermes", "llama3_json"
+                                             # Depends on model's tool calling format
+
+            # - "--scheduling-policy"       # How to schedule requests
+            #   - "fcfs"                    # Options: "fcfs" (first-come-first-served), "priority"
+                                             # Default: "fcfs"
+
+            # - "--preemption-mode"         # What to do when GPU memory is full
+            #   - "recompute"              # Options: "recompute", "swap"
+                                            # "recompute": evict KV cache, recompute when needed
+                                            # "swap": move KV cache to CPU (needs --swap-space)
+
+            # - "--enable-request-id-headers"  # Include request ID in response headers
+                                                # Useful for tracing/debugging in production
+
+            # - "--disable-frontend-multiprocessing"  # Run API server in single process
+                                                       # Useful for debugging
           ports:
             - containerPort: 8001
               name: http
@@ -102,7 +408,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: vllm
+  name: vllm-svc
   namespace: email-agent
 spec:
   selector:
